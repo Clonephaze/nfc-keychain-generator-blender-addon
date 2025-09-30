@@ -12,9 +12,7 @@ type = "add-on"
 blender_version_min = "4.2.0"
 
 # License and website information
-license = [
-    "GPL-3.0-or-later",
-]
+license = ['SPDX:GPL-3.0-or-later']
 website = "https://github.com/clonephaze/NFC-Card-Keychain-w--QR-or-Logo-Placer"
 copyright = [
     "2025 Clonephaze",
@@ -22,13 +20,10 @@ copyright = [
 
 # Tags for categorization in Blender's add-on browser
 tags = [
-    "3D-Printing",
-    "Geometry Nodes", 
-    "Modeling",
-    "Generator",
-    "NFC",
-    "QR Code",
-    "Keychain",
+    "3D View",
+	"Modeling",
+	"Object",
+	"User Interface",
 ]
 
 # Detailed description
