@@ -9,10 +9,6 @@ This module handles generating different types of QR codes using the segno libra
 
 import os
 import tempfile
-
-# Import segno for QR code generation
-# Why segno? Segno is a pure Python QR code library that's smaller, more reliable
-# than other options and produces better quality codes with more format options
 import traceback
 from typing import Optional
 
@@ -45,7 +41,6 @@ class QRCodeGenerator:
     - Contact (vCard) QR codes for contact information
     """
 
-    # QR code type constants
     QR_TYPE_TEXT = "TEXT"
     QR_TYPE_WIFI = "WIFI"
     QR_TYPE_CONTACT = "CONTACT"
@@ -111,11 +106,9 @@ class QRCodeGenerator:
             return None
 
         try:
-            # Determine security type
             if not password:
                 security = "nopass"
 
-            # Create WiFi QR code using segno's helpers
             qr = helpers.make_wifi(
                 ssid=ssid, password=password, security=security, hidden=hidden
             )
@@ -152,11 +145,10 @@ class QRCodeGenerator:
             return None
 
         try:
-            # Create vCard QR code using segno's helpers
-            # segno's make_vcard requires 'name' and 'displayname' as first two positional arguments
+            # segno's make_vcard requires both 'name' and 'displayname' as first two parameters
             qr = helpers.make_vcard(
-                name=name,  # Required: structured name (first parameter)
-                displayname=name,  # Required: display name (second parameter)
+                name=name,
+                displayname=name,
                 phone=phone or None,
                 email=email or None,
                 url=url or None,
@@ -224,43 +216,31 @@ class QRCodeGenerator:
         if not qr_data:
             return None
 
-        # Get QR code matrix
-        # WHY: We need the raw module data to create individual cubes for each pixel
-        matrix = []
-        for row in qr_data.matrix:
-            matrix.append(list(row))
+        matrix = [list(row) for row in qr_data.matrix]
+        qr_size = len(matrix)
+        module_size = size / qr_size
 
-        qr_size = len(matrix)  # QR codes are always square
-        module_size = size / qr_size  # Size of each individual module
-
-        # Create new mesh
         mesh = bpy.data.meshes.new("QR_Code")
         qr_object = bpy.data.objects.new("QR_Code", mesh)
-
-        # Add to scene
         bpy.context.collection.objects.link(qr_object)
 
-        # Create mesh data using bmesh for easier manipulation
         bm = bmesh.new()
 
         try:
-            # Create cubes for each dark module (True values in matrix)
             for row_idx, row in enumerate(matrix):
                 for col_idx, is_dark in enumerate(row):
-                    if is_dark:  # Only create geometry for dark modules
-                        # Calculate position for this module
+                    if is_dark:
                         x = (col_idx - qr_size / 2) * module_size
                         y = (row_idx - qr_size / 2) * module_size
                         z = 0
 
-                        # Create cube for this module
+                        # 0.9 scale creates small gaps between modules for better definition
                         bmesh.ops.create_cube(
                             bm,
-                            size=module_size * 0.9,  # Slightly smaller to create gaps
+                            size=module_size * 0.9,
                             matrix=bpy.utils.Matrix.Translation((x, y, z)),
                         )
 
-            # Update mesh
             bm.to_mesh(mesh)
             mesh.update()
 
@@ -284,28 +264,22 @@ class QRCodeGenerator:
         Returns:
             The created material.
         """
-        # Create new material
         material = bpy.data.materials.new(name=name)
         material.use_nodes = True
 
-        # Clear default nodes
         nodes = material.node_tree.nodes
         nodes.clear()
 
-        # Add principled BSDF and output nodes
         bsdf = nodes.new(type="ShaderNodeBsdfPrincipled")
         output = nodes.new(type="ShaderNodeOutputMaterial")
 
-        # Set up QR code material properties
-        # WHY: Dark, matte material ensures good contrast and scannability
-        bsdf.inputs["Base Color"].default_value = (0.05, 0.05, 0.05, 1.0)  # Very dark
+        # Dark, matte material ensures good contrast and scannability
+        bsdf.inputs["Base Color"].default_value = (0.05, 0.05, 0.05, 1.0)
         bsdf.inputs["Metallic"].default_value = 0.0
-        bsdf.inputs["Roughness"].default_value = 0.9  # Matte finish
+        bsdf.inputs["Roughness"].default_value = 0.9
 
-        # Link nodes
         material.node_tree.links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
 
-        # Position nodes
         bsdf.location = (0, 0)
         output.location = (200, 0)
 
@@ -325,7 +299,6 @@ class QRCodeGenerator:
         if not qr_object:
             return
 
-        # Get current QR code bounds
         bbox_corners = [
             qr_object.matrix_world @ vertex.co for vertex in qr_object.bound_box
         ]
@@ -336,15 +309,11 @@ class QRCodeGenerator:
             - min(corner.y for corner in bbox_corners),
         )
 
-        # Scale to target size
         if current_size > 0:
             scale_factor = target_size / current_size
             qr_object.scale = (scale_factor, scale_factor, scale_factor)
 
-        # Position at origin - your geometry nodes will handle final placement
         qr_object.location = (0, 0, 0)
-
-        # Name for identification
         qr_object.name = "QR_Code"
 
 
@@ -363,29 +332,17 @@ def generate_qr_for_card(qr_type: str, **qr_params) -> Optional[Object]:
         print("Segno library not available for QR code generation")
         return None
 
-    # Generate QR code data based on type
     qr_data = QRCodeGenerator.generate_qr_by_type(qr_type, **qr_params)
     if not qr_data:
         print(f"Failed to generate {qr_type} QR code")
         return None
 
-    # Create mesh from QR data
-    qr_object = QRCodeGenerator.create_qr_mesh_from_data(
-        qr_data, size=0.02
-    )  # 20mm default
+    qr_object = QRCodeGenerator.create_qr_mesh_from_data(qr_data, size=0.02)
     if not qr_object:
         print("Failed to create QR code mesh")
         return None
 
-    # Prepare QR code for card placement (scales to 25mm by default)
     QRCodeGenerator.prepare_qr_for_card(qr_object)
-
-    # Apply QR code material
-    # Note: Material application is handled by geometry nodes pipeline
-    # qr_material = QRCodeGenerator.create_qr_material(f"QR_{qr_type}_Material")
-    # qr_object.data.materials.append(qr_material)
-
-    # Name the object to indicate its type
     qr_object.name = f"QR_Code_{qr_type}"
 
     return qr_object
@@ -419,11 +376,6 @@ def generate_contact_qr_for_card(
     )
 
 
-# ============================================================================
-# BLENDER OPERATORS FOR QR CODE GENERATION
-# ============================================================================
-
-
 class OBJECT_OT_nfc_toggle_qr_mode(Operator):
     """Toggle QR code generation mode for a design slot"""
 
@@ -432,7 +384,6 @@ class OBJECT_OT_nfc_toggle_qr_mode(Operator):
     bl_description = "Toggle between SVG import and QR code generation mode"
     bl_options = {"REGISTER", "UNDO"}
 
-    # Design number (1 or 2)
     design_num: bpy.props.IntProperty(
         name="Design Number",
         description="Which design slot to toggle (1 or 2)",
@@ -441,7 +392,6 @@ class OBJECT_OT_nfc_toggle_qr_mode(Operator):
         max=2,
     )
 
-    # Enable QR mode (True) or SVG mode (False)
     enable_qr: bpy.props.BoolProperty(
         name="Enable QR Mode",
         description="Whether to enable QR mode (True) or SVG mode (False)",
@@ -459,12 +409,10 @@ class OBJECT_OT_nfc_toggle_qr_mode(Operator):
 
         if self.design_num == 1:
             props.qr_mode_1 = self.enable_qr
-            # Reset design status when switching modes
             if props.qr_mode_1 != self.enable_qr:
                 props.has_design_1 = False
         else:
             props.qr_mode_2 = self.enable_qr
-            # Reset design status when switching modes
             if props.qr_mode_2 != self.enable_qr:
                 props.has_design_2 = False
 
@@ -479,7 +427,6 @@ class OBJECT_OT_nfc_generate_qr(Operator):
     bl_description = "Generate a QR code based on the selected type and settings"
     bl_options = {"REGISTER", "UNDO"}
 
-    # Design number (1 or 2)
     design_num: bpy.props.IntProperty(
         name="Design Number",
         description="Which design slot to use (1 or 2)",
@@ -495,82 +442,86 @@ class OBJECT_OT_nfc_generate_qr(Operator):
             return False
         return QRCodeGenerator.is_segno_available()
 
+    def _get_qr_settings(self, props, design_num: int):
+        """Helper to get QR settings for a design slot."""
+        if design_num == 1:
+            return {
+                "qr_type": props.qr_type_1,
+                "error_correction": props.qr_error_correction_1,
+                "text_content": props.qr_text_content_1,
+                "wifi_ssid": props.qr_wifi_ssid_1,
+                "wifi_password": props.qr_wifi_password_1,
+                "wifi_security": props.qr_wifi_security_1,
+                "wifi_hidden": props.qr_wifi_hidden_1,
+                "contact_name": props.qr_contact_name_1,
+                "contact_phone": props.qr_contact_phone_1,
+                "contact_email": props.qr_contact_email_1,
+                "contact_url": props.qr_contact_url_1,
+                "contact_org": props.qr_contact_org_1,
+            }
+        else:
+            return {
+                "qr_type": props.qr_type_2,
+                "error_correction": props.qr_error_correction_2,
+                "text_content": props.qr_text_content_2,
+                "wifi_ssid": props.qr_wifi_ssid_2,
+                "wifi_password": props.qr_wifi_password_2,
+                "wifi_security": props.qr_wifi_security_2,
+                "wifi_hidden": props.qr_wifi_hidden_2,
+                "contact_name": props.qr_contact_name_2,
+                "contact_phone": props.qr_contact_phone_2,
+                "contact_email": props.qr_contact_email_2,
+                "contact_url": props.qr_contact_url_2,
+                "contact_org": props.qr_contact_org_2,
+            }
+
+    def _build_qr_params(self, qr_type: str, settings: dict):
+        """Helper to build QR parameters based on type."""
+        qr_params = {"error_correction": settings["error_correction"]}
+
+        if qr_type == "TEXT":
+            content = settings["text_content"]
+            if not content.strip():
+                return None, "Please enter text or URL content"
+            qr_params["content"] = content
+
+        elif qr_type == "WIFI":
+            ssid = settings["wifi_ssid"]
+            if not ssid.strip():
+                return None, "Please enter WiFi network name (SSID)"
+            qr_params.update({
+                "ssid": ssid,
+                "password": settings["wifi_password"],
+                "security": settings["wifi_security"],
+                "hidden": settings["wifi_hidden"],
+            })
+
+        elif qr_type == "CONTACT":
+            name = settings["contact_name"]
+            if not name.strip():
+                return None, "Please enter contact name"
+            qr_params.update({
+                "name": name,
+                "phone": settings["contact_phone"],
+                "email": settings["contact_email"],
+                "url": settings["contact_url"],
+                "org": settings["contact_org"],
+            })
+
+        return qr_params, None
+
     def execute(self, context):
         """Generate QR code and process it."""
         props = context.scene.nfc_card_props
 
-        # Get QR settings for the design slot
-        if self.design_num == 1:
-            qr_type = props.qr_type_1
-            error_correction = props.qr_error_correction_1
-        else:
-            qr_type = props.qr_type_2
-            error_correction = props.qr_error_correction_2
+        settings = self._get_qr_settings(props, self.design_num)
+        qr_type = settings["qr_type"]
 
-        # Prepare QR generation parameters
-        qr_params = {"error_correction": error_correction}
+        qr_params, error_msg = self._build_qr_params(qr_type, settings)
+        if error_msg:
+            self.report({"ERROR"}, error_msg)
+            return {"CANCELLED"}
 
-        # Add type-specific parameters
-        if qr_type == "TEXT":
-            if self.design_num == 1:
-                content = props.qr_text_content_1
-            else:
-                content = props.qr_text_content_2
-
-            if not content.strip():
-                self.report({"ERROR"}, "Please enter text or URL content")
-                return {"CANCELLED"}
-
-            qr_params["content"] = content
-
-        elif qr_type == "WIFI":
-            if self.design_num == 1:
-                ssid = props.qr_wifi_ssid_1
-                password = props.qr_wifi_password_1
-                security = props.qr_wifi_security_1
-                hidden = props.qr_wifi_hidden_1
-            else:
-                ssid = props.qr_wifi_ssid_2
-                password = props.qr_wifi_password_2
-                security = props.qr_wifi_security_2
-                hidden = props.qr_wifi_hidden_2
-
-            if not ssid.strip():
-                self.report({"ERROR"}, "Please enter WiFi network name (SSID)")
-                return {"CANCELLED"}
-
-            qr_params.update(
-                {
-                    "ssid": ssid,
-                    "password": password,
-                    "security": security,
-                    "hidden": hidden,
-                }
-            )
-
-        elif qr_type == "CONTACT":
-            if self.design_num == 1:
-                name = props.qr_contact_name_1
-                phone = props.qr_contact_phone_1
-                email = props.qr_contact_email_1
-                url = props.qr_contact_url_1
-                org = props.qr_contact_org_1
-            else:
-                name = props.qr_contact_name_2
-                phone = props.qr_contact_phone_2
-                email = props.qr_contact_email_2
-                url = props.qr_contact_url_2
-                org = props.qr_contact_org_2
-
-            if not name.strip():
-                self.report({"ERROR"}, "Please enter contact name")
-                return {"CANCELLED"}
-
-            qr_params.update(
-                {"name": name, "phone": phone, "email": email, "url": url, "org": org}
-            )
-
-        # Generate QR code
         print(f"[QR Debug] Generating {qr_type} QR code with params: {qr_params}")
         qr_code = QRCodeGenerator.generate_qr_by_type(qr_type, **qr_params)
         if not qr_code:
@@ -580,76 +531,41 @@ class OBJECT_OT_nfc_generate_qr(Operator):
 
         print(f"[QR Debug] QR code generated successfully, version: {qr_code.version}")
 
-        # Save QR code to temporary SVG file
         try:
-            # Create temporary file
             with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".svg", delete=False
             ) as temp_file:
                 temp_svg_path = temp_file.name
 
             print(f"[QR Debug] Temporary SVG path: {temp_svg_path}")
-
-            # Create our own SVG with filled rectangles instead of using Segno's SVG export
             print("[QR Debug] Creating custom SVG with filled rectangles...")
 
-            # Get the QR code matrix
-            matrix = []
-            for row in qr_code.matrix:
-                matrix.append(list(row))
-
+            matrix = [list(row) for row in qr_code.matrix]
             qr_size = len(matrix)
-            module_size = 1.0  # Size of each QR module in SVG units
+            module_size = 1.0
 
-            # Create SVG content with filled rectangles (NO white background)
-            svg_width = qr_size * module_size
-            svg_height = qr_size * module_size
+            svg_content = self._create_qr_svg(matrix, qr_size, module_size)
 
-            svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="{svg_height}" viewBox="0 0 {svg_width} {svg_height}">
-'''
-
-            # Add ONLY black rectangles for each dark module (no white background)
-            for row_idx, row in enumerate(matrix):
-                for col_idx, is_dark in enumerate(row):
-                    if is_dark:  # Dark module only
-                        x = col_idx * module_size
-                        y = row_idx * module_size
-                        svg_content += f'<rect x="{x}" y="{y}" width="{module_size}" height="{module_size}" fill="black"/>\n'
-
-            svg_content += "</svg>"
-
-            # Write the custom SVG
             with open(temp_svg_path, "w") as f:
                 f.write(svg_content)
 
             print(f"[QR Debug] Custom SVG created with {qr_size}x{qr_size} modules")
-
-            # Import and process the SVG using the proper pipeline
             print("[QR Debug] Processing SVG through proper pipeline...")
+            
             from . import svg_import
-
-            success = svg_import.process_svg_to_mesh(temp_svg_path, self.design_num)
+            success = svg_import.process_svg_to_mesh(temp_svg_path, self.design_num, self.report)
 
             if success:
                 print("[QR Debug] QR SVG processed successfully!")
-
-                # Set the design status
                 if self.design_num == 1:
                     props.has_design_1 = True
                 else:
                     props.has_design_2 = True
-
-                self.report(
-                    {"INFO"},
-                    f"QR code generated successfully for Design {self.design_num}",
-                )
             else:
                 print("[QR Debug] Failed to process QR SVG")
                 self.report({"ERROR"}, "Failed to process QR code SVG")
                 return {"CANCELLED"}
 
-            # Clean up temporary file
             try:
                 os.unlink(temp_svg_path)
                 print("[QR Debug] Temporary file cleaned up")
@@ -658,34 +574,44 @@ class OBJECT_OT_nfc_generate_qr(Operator):
 
         except Exception as e:
             print(f"[QR Debug] Exception during QR generation: {e}")
-            import traceback
-
             traceback.print_exc()
             self.report({"ERROR"}, f"Failed to generate QR code: {str(e)}")
             return {"CANCELLED"}
 
         return {"FINISHED"}
 
+    def _create_qr_svg(self, matrix, qr_size: int, module_size: float) -> str:
+        """Helper to create SVG content from QR matrix."""
+        svg_width = qr_size * module_size
+        svg_height = qr_size * module_size
+
+        # No white background - only black modules for proper SVG import
+        svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="{svg_height}" viewBox="0 0 {svg_width} {svg_height}">
+'''
+
+        for row_idx, row in enumerate(matrix):
+            for col_idx, is_dark in enumerate(row):
+                if is_dark:
+                    x = col_idx * module_size
+                    y = row_idx * module_size
+                    svg_content += f'<rect x="{x}" y="{y}" width="{module_size}" height="{module_size}" fill="black"/>\n'
+
+        svg_content += "</svg>"
+        return svg_content
+
 
 def register() -> None:
-    """Register QR code generation functionality."""
     if not QRCodeGenerator.is_segno_available():
         print(
             "Warning: segno library not available. QR code generation will be disabled."
         )
         print("To enable QR codes, install the segno wheel in the add-on directory.")
 
-    # Register operators
     bpy.utils.register_class(OBJECT_OT_nfc_toggle_qr_mode)
     bpy.utils.register_class(OBJECT_OT_nfc_generate_qr)
 
 
 def unregister() -> None:
-    """Unregister QR code generation functionality."""
-    # Unregister operators
     bpy.utils.unregister_class(OBJECT_OT_nfc_generate_qr)
     bpy.utils.unregister_class(OBJECT_OT_nfc_toggle_qr_mode)
-
-    # Clean up any materials or other resources created during QR generation
-    # TODO: Implement cleanup of QR materials when add-on is disabled
-    pass
