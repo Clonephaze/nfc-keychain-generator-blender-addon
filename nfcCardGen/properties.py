@@ -304,7 +304,7 @@ class NFCCardProperties(PropertyGroup):
     mag_padding: bpy.props.FloatProperty(
         name="Magnet Edge Padding",
         description="Padding around the edges of the magnet holes",
-        default=22,
+        default=12,
         min=0.0,
         max=50.0,
         precision=2,
