@@ -141,6 +141,11 @@ def update_scale_2(self, context):
     update_property(self, context, "scale_2", "SCALE_2", self.scale_2)
 
 
+def update_nfc_cavity_height(self, context):
+    """Update callback for nfc_cavity_height property."""
+    update_property(self, context, "nfc_cavity_height", "NFC_CAVITY_HEIGHT", self.nfc_cavity_height)
+
+
 class NFCCardProperties(PropertyGroup):
     """
     Property group for NFC card/keychain generation parameters.
@@ -260,6 +265,33 @@ class NFCCardProperties(PropertyGroup):
         min=1,
         max=40,
         update=update_bevel_segment_count,
+    )
+    
+    # NFC Cavity type choice property
+    nfc_cavity_choice: EnumProperty(
+        name="NFC Cavity Shape",
+        description="Select the shape of the NFC cavity(s)",
+        items=[
+            ("RECTANGLE", "Rectangle", "Rectangular NFC cavity"),
+            ("CIRCLE", "Circle", "Circular NFC cavity"),
+            ("DOUBLE_CIRCLE", "Double Circle", "Two circular NFC cavities (Rectangular Shape Only)"),
+        ],
+        default="RECTANGLE",
+        # No update callback - use operator buttons instead
+    )
+    
+    # NFC Cavity height property
+    nfc_cavity_height: bpy.props.FloatProperty(
+        name="NFC Cavity Height",
+        description="Height of the NFC cavity - changing this can cause clipping with design layers, though it may be necessary for certain NFC tags",
+        default=0.8,
+        min=0.6,
+        max=1,
+        precision=2,
+        step=1,
+        # unit="LENGTH",
+        subtype="FACTOR",
+        update=update_nfc_cavity_height,
     )
 
     # Magnet shape property

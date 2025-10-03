@@ -6,6 +6,7 @@ from the UI panel. These operators will append the pre-built geometry node setup
 and provide automation for SVG processing.
 """
 
+import math
 import os
 from typing import Set
 
@@ -84,6 +85,9 @@ class OBJECT_OT_scene_setup(Operator):
 
             # Setup drivers between modifiers
             self._setup_modifier_drivers(card_obj)
+
+            # Set the view to a nice initial angle
+            bpy.ops.object.nfc_set_view(view_type='FULL')
 
             return {"FINISHED"}
 
@@ -268,27 +272,57 @@ class OBJECT_OT_nfc_set_shape_preset(Operator):
 
     def execute(self, context) -> Set[str]:
         """Set the shape preset via the modifier socket."""
-        ensure_scene_mode("OBJECT", report=self.report)
-
-        print(f"Setting shape to: {self.shape_type}")
-
-        # Update the property
-        context.scene.nfc_card_props.shape_preset = self.shape_type
-
-        # Determine the value to set (0 = Rectangle, 1 = Circle)
-        choice = 0 if self.shape_type == "RECTANGLE" else 1
-        print(f"Choice value: {choice}")
-
-        if update_modifier_option("SHAPE_CHOICE", choice, self.report):
-            force_update_ui_and_geometry(context, "shape_preset")
-
-            return {"FINISHED"}
-        else:
-            return {"CANCELLED"}
+        shape_map = {
+            "RECTANGLE": 0,
+            "CIRCLE": 1,
+        }
+        return _set_enum_property_with_mapping(
+            context, self, "shape_preset", self.shape_type, "SHAPE_CHOICE", shape_map
+        )
 
 
 # HELPER FUNCTIONS
 # All utility functions moved to utils.py
+
+
+def _set_enum_property_with_mapping(
+    context,
+    operator,
+    prop_name: str,
+    enum_value: str,
+    modifier_key: str,
+    value_map: dict
+) -> Set[str]:
+    """
+    Helper function to set an enum property and update the corresponding modifier.
+    
+    Args:
+        context: Blender context
+        operator: The operator calling this function (for reporting)
+        prop_name: Name of the property on nfc_card_props (e.g., "mag_shape")
+        enum_value: The enum string value (e.g., "CIRCLE")
+        modifier_key: The key in MOD_OPT_MAPPING (e.g., "MAG_SHAPE")
+        value_map: Dictionary mapping enum strings to integers
+    
+    Returns:
+        Set with operation result ('FINISHED' or 'CANCELLED')
+    """
+    ensure_scene_mode("OBJECT", report=operator.report)
+    
+    print(f"Setting {prop_name} to: {enum_value}")
+    
+    # Update the property
+    setattr(context.scene.nfc_card_props, prop_name, enum_value)
+    
+    # Convert enum to integer using the provided mapping
+    int_value = value_map.get(enum_value, 0)
+    print(f"Mapped value: {int_value}")
+    
+    if update_modifier_option(modifier_key, int_value, operator.report):
+        force_update_ui_and_geometry(context, prop_name)
+        return {"FINISHED"}
+    else:
+        return {"CANCELLED"}
 
 
 class OBJECT_OT_nfc_toggle_magnet_shape(Operator):
@@ -321,20 +355,154 @@ class OBJECT_OT_nfc_toggle_magnet_shape(Operator):
 
     def execute(self, context) -> Set[str]:
         """Set the magnet shape via the modifier socket."""
-        ensure_scene_mode("OBJECT", report=self.report)
+        magnet_shape_map = {
+            "CIRCLE": 0,
+            "HEXAGON": 1,
+        }
+        return _set_enum_property_with_mapping(
+            context, self, "mag_shape", self.shape_type, "MAG_SHAPE", magnet_shape_map
+        )
 
-        print(f"Setting magnet shape to: {self.shape_type}")
 
-        # Update the property
-        context.scene.nfc_card_props.mag_shape = self.shape_type
+class OBJECT_OT_nfc_set_cavity_shape(Operator):
+    """Set NFC cavity shape (rectangle, circle, or double circle)"""
+
+    bl_idname = "object.nfc_set_cavity_shape"
+    bl_label = "Set Cavity Shape"
+    bl_description = "Set the shape of the NFC cavity"
+    bl_options = {"REGISTER", "UNDO"}
+
+    # Property to determine which shape to set
+    shape_type: bpy.props.EnumProperty(
+        name="Shape Type",
+        description="Which cavity shape to set",
+        items=[
+            ("RECTANGLE", "Rectangle", "Rectangular NFC cavity"),
+            ("CIRCLE", "Circle", "Circular NFC cavity"),
+            ("DOUBLE_CIRCLE", "Double Circle", "Two circular NFC cavities"),
+        ],
+        default="RECTANGLE",
+    )
+
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only allow if scene is set up, Card object exists, and NFC is enabled."""
+        if not context.scene.nfc_card_props.scene_setup:
+            return False
+        if not context.scene.nfc_card_props.nfc_choice:
+            return False
+        return OBJECT_NAME in bpy.data.objects
+
+    def execute(self, context) -> Set[str]:
+        """Set the cavity shape via the modifier socket."""
+        cavity_shape_map = {
+            "RECTANGLE": 0,
+            "CIRCLE": 1,
+            "DOUBLE_CIRCLE": 2,
+        }
+        return _set_enum_property_with_mapping(
+            context, self, "nfc_cavity_choice", self.shape_type, "NFC_CAVITY_CHOICE", cavity_shape_map
+        )
+
+
+class OBJECT_OT_nfc_set_view(Operator):
+    """Set the 3D viewport to a specific view angle and frame the card"""
+    
+    bl_idname = "object.nfc_set_view"
+    bl_label = "Set View"
+    bl_description = "Change the 3D viewport to focus on specific parts of the card"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    view_type: bpy.props.EnumProperty(
+        name="View Type",
+        items=[
+            ('FULL', "Full View", "Zoomed out full view of the card"),
+            ('TOP_ANGLE', "Top Angle", "Angled top view showing side"),
+            ('BOTTOM', "Bottom View", "View from bottom for magnets"),
+            ('SIDE', "Side View", "View from side"),
+            ('SIDE_XRAY', "Side X-Ray", "Side view with X-ray enabled"),
+            ('TOP', "Top View", "View from directly above"),
+        ],
+        default='FULL'
+    )
+    
+    enable_xray: bpy.props.BoolProperty(
+        name="Enable X-Ray",
+        description="Enable X-ray mode for this view",
+        default=False
+    )
+    
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only allow if scene is set up and Card object exists."""
+        if not context.scene.nfc_card_props.scene_setup:
+            return False
+        return OBJECT_NAME in bpy.data.objects
+    
+    def execute(self, context) -> Set[str]:
+        """Set the 3D viewport to the specified view."""
+        # Find the 3D view area
+        area = None
+        for a in context.screen.areas:
+            if a.type == 'VIEW_3D':
+                area = a
+                break
         
-        # The conversion between string enum and integer is handled in update_modifier_option
-        if update_modifier_option("MAG_SHAPE", self.shape_type, self.report):
-            force_update_ui_and_geometry(context, "mag_shape")
+        if not area:
+            self.report({'WARNING'}, "No 3D View found")
+            return {'CANCELLED'}
+        
+        space = area.spaces.active
+        
+        # Get the card object to frame it
+        card_obj = bpy.data.objects.get(OBJECT_NAME)
+        
+        if card_obj:
+            # Select and make active
+            bpy.ops.object.select_all(action='DESELECT')
+            card_obj.select_set(True)
+            context.view_layer.objects.active = card_obj
+        
+        # Set the view based on type
+        if self.view_type == 'TOP':
+            bpy.ops.view3d.view_axis(type='TOP')
+            space.shading.show_xray = self.enable_xray
             
-            return {"FINISHED"}
-        else:
-            return {"CANCELLED"}
+        elif self.view_type == 'TOP_ANGLE':
+            # Set to top view first (numpad 7)
+            bpy.ops.view3d.view_axis(type='TOP')
+            # Rotate down twice (numpad 2, 2) - rotate the view to look down at an angle
+            bpy.ops.view3d.view_orbit(type='ORBITDOWN')
+            bpy.ops.view3d.view_orbit(type='ORBITDOWN')
+            # Exit orthographic view (numpad 5)
+            if not space.region_3d.is_perspective:
+                bpy.ops.view3d.view_persportho()
+            space.shading.show_xray = self.enable_xray
+            
+        elif self.view_type == 'BOTTOM':
+            bpy.ops.view3d.view_axis(type='BOTTOM')
+            space.shading.show_xray = self.enable_xray
+            
+        elif self.view_type == 'SIDE':
+            bpy.ops.view3d.view_axis(type='FRONT')
+            space.shading.show_xray = self.enable_xray
+            
+        elif self.view_type == 'SIDE_XRAY':
+            bpy.ops.view3d.view_axis(type='FRONT')
+            space.shading.show_xray = True
+            
+        elif self.view_type == 'FULL':
+            # Set to a nice angled view
+            bpy.ops.view3d.view_axis(type='TOP')
+            bpy.ops.view3d.view_orbit(type='ORBITDOWN')
+            bpy.ops.view3d.view_orbit(type='ORBITDOWN')
+            space.shading.show_xray = False
+        
+        # Frame the selected object
+        if card_obj:
+            bpy.ops.view3d.view_selected()
+        
+        return {'FINISHED'}
 
 
 class OBJECT_OT_nfc_export_stl(Operator, ExportHelper):
@@ -393,6 +561,8 @@ CLASSES = (
     OBJECT_OT_nfc_toggle_boolean_option,
     OBJECT_OT_nfc_set_shape_preset,
     OBJECT_OT_nfc_toggle_magnet_shape,
+    OBJECT_OT_nfc_set_cavity_shape,
+    OBJECT_OT_nfc_set_view,
     OBJECT_OT_nfc_export_stl,
 )
 

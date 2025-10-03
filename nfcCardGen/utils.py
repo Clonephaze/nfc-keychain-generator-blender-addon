@@ -22,6 +22,8 @@ MOD_OPT_MAPPING = {
     "BEVEL_SEGMENTS": ("Outer Shape", "Bevel Segments"),
     "REAL_BEVEL_AMOUNT": ("Bevel", "Amount"),
     "REAL_BEVEL_SEGMENTS": ("Bevel", "Segments"),
+    "NFC_CAVITY_CHOICE": ("Inner Hole and Magnets", "Cavity Shape Options"),
+    "NFC_CAVITY_HEIGHT": ("Inner Hole and Magnets", "Cavity Height"),
     "MAG_SHAPE": ("Inner Hole and Magnets", "Hole Shape"),
     "MAG_WIDTH": ("Inner Hole and Magnets", "Hole Width"),
     "MAG_TAPER": ("Inner Hole and Magnets", "Hole Taper"),
@@ -86,9 +88,11 @@ def update_modifier_option(logical_name, value, report_func=None):
 
     # Special handling for enum properties that need to be stored as integers in geometry nodes
     if logical_name == "MAG_SHAPE":
-        # Convert string enum value to integer value
+        # Convert string enum value to integer value if it's a string
         # "CIRCLE" = 0, "HEXAGON" = 1
-        value = 0 if value == "CIRCLE" else 1
+        if isinstance(value, str):
+            value = 0 if value == "CIRCLE" else 1
+        # If it's already an integer, use it as-is
 
     modifier_name, socket_name = MOD_OPT_MAPPING[logical_name]
     return update_modifier_input(modifier_name, socket_name, value, report_func)

@@ -50,6 +50,14 @@ class VIEW3D_PT_tag_card_shape(Panel):
         if not props.scene_setup:
             return
 
+        # View control button
+        view_box = layout.box()
+        view_box.label(text="View:", icon='VIEW3D')
+        view_op = view_box.operator("object.nfc_set_view", text="Top/Side View", icon='AXIS_TOP')
+        view_op.view_type = 'TOP_ANGLE'
+
+        layout.separator()
+
         self._shape_choice_section(layout, props)
 
         layout.separator()
@@ -136,8 +144,8 @@ class VIEW3D_PT_tag_card_shape(Panel):
         col.prop(props, "bevel_segments")
 
 
-class VIEW3D_PT_tag_card_magnet(Panel):
-    """Panel for magnet hole settings"""
+class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
+    """Panel for magnet hole and NFC cavity settings"""
 
     bl_label = "Magnet Settings"
     bl_idname = "VIEW3D_PT_tag_card_magnet"
@@ -153,13 +161,35 @@ class VIEW3D_PT_tag_card_magnet(Panel):
         if not props.scene_setup:
             return
 
+        # View control buttons
+        view_box = layout.box()
+        view_box.label(text="View:", icon='VIEW3D')
+        row = view_box.row(align=True)
+        
+        # Side X-Ray view for cutout
+        side_op = row.operator("object.nfc_set_view", text="Side (X-Ray)", icon='XRAY')
+        side_op.view_type = 'SIDE_XRAY'
+        
+        # Bottom view for magnets
+        if props.magnet_choice:
+            bottom_op = row.operator("object.nfc_set_view", text="Bottom", icon='AXIS_TOP')
+            bottom_op.view_type = 'BOTTOM'
+
+        layout.separator()
+
+        _draw_nfc_cavity_section = self._draw_nfc_cavity_section(layout, props)
+        _draw_magnet_section = self._draw_magnet_section(layout, props)
+
+    def _draw_magnet_section(self, layout, props) -> None:
         layout.label(
             text="Magnet Shape:"
             if props.magnet_choice
             else "Not Generating Magnet Holes"
         )
+
         if not props.magnet_choice:
             return
+
         row = layout.row(align=True)
 
         layout.label(text="Magnet Hole Settings:")
@@ -184,6 +214,41 @@ class VIEW3D_PT_tag_card_magnet(Panel):
         layout.prop(props, "mag_width", text="Magnet Width")
         layout.prop(props, "mag_taper", text="Magnet Taper")
         layout.prop(props, "mag_padding", text="Edge Padding")
+
+    def _draw_nfc_cavity_section(self, layout, props) -> None:
+        """Draw the NFC cavity settings section."""
+        layout.label(text="NFC Cavity Settings:")
+        
+        # Cavity shape buttons
+        layout.label(text="Cavity Shape:")
+        row = layout.row(align=True)
+        
+        # Rectangle button
+        rect_op = row.operator(
+            "object.nfc_set_cavity_shape",
+            text="Rectangle",
+            depress=(props.nfc_cavity_choice == "RECTANGLE"),
+        )
+        rect_op.shape_type = "RECTANGLE"
+        
+        # Circle button
+        circle_op = row.operator(
+            "object.nfc_set_cavity_shape",
+            text="Circle",
+            depress=(props.nfc_cavity_choice == "CIRCLE"),
+        )
+        circle_op.shape_type = "CIRCLE"
+        
+        # Double Circle button (only for rectangle shapes)
+        if props.shape_preset == "RECTANGLE":
+            double_op = row.operator(
+                "object.nfc_set_cavity_shape",
+                text="Double Circle",
+                depress=(props.nfc_cavity_choice == "DOUBLE_CIRCLE"),
+            )
+            double_op.shape_type = "DOUBLE_CIRCLE"
+        
+        layout.prop(props, "nfc_cavity_height", text="Cavity Height")
 
 
 class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
@@ -214,6 +279,21 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
 
         if not props.scene_setup:
             return
+
+        # View control buttons
+        view_box = layout.box()
+        view_box.label(text="View:", icon='VIEW3D')
+        row = view_box.row(align=True)
+        
+        # Top view to see design
+        top_op = row.operator("object.nfc_set_view", text="Top", icon='AXIS_TOP')
+        top_op.view_type = 'TOP'
+        
+        # Side view to see inset/outset
+        side_op = row.operator("object.nfc_set_view", text="Side", icon='AXIS_SIDE')
+        side_op.view_type = 'SIDE'
+
+        layout.separator()
 
         self._draw_inset_choice(layout, props)
         self._draw_design_section(layout, props, design_num=1)
@@ -372,7 +452,9 @@ class VIEW3D_PT_tag_card_export(Panel):
         col = export_box.column(align=True)
         col.scale_y = 0.8
         col.label(text="Tips for 3D Printing:", icon="INFO")
-        col.label(text="• Print with supports if needed")
+        col.label(
+            text="• Remember to add a pause right before the cavity layer fills in"
+        )
         col.label(text="• 0.2mm layer height recommended")
         col.label(text="• PLA/PETG materials work well")
 
@@ -381,7 +463,7 @@ def register() -> None:
     """Register all panel classes with Blender."""
     bpy.utils.register_class(VIEW3D_PT_tag_card_main)
     bpy.utils.register_class(VIEW3D_PT_tag_card_shape)
-    bpy.utils.register_class(VIEW3D_PT_tag_card_magnet)
+    bpy.utils.register_class(VIEW3D_PT_tag_card_magnet_and_cavity)
     bpy.utils.register_class(VIEW3D_PT_tag_svg_to_mesh_design)
     bpy.utils.register_class(VIEW3D_PT_tag_card_export)
 
@@ -390,6 +472,6 @@ def unregister() -> None:
     """Unregister all panel classes from Blender."""
     bpy.utils.unregister_class(VIEW3D_PT_tag_card_export)
     bpy.utils.unregister_class(VIEW3D_PT_tag_svg_to_mesh_design)
-    bpy.utils.unregister_class(VIEW3D_PT_tag_card_magnet)
+    bpy.utils.unregister_class(VIEW3D_PT_tag_card_magnet_and_cavity)
     bpy.utils.unregister_class(VIEW3D_PT_tag_card_shape)
     bpy.utils.unregister_class(VIEW3D_PT_tag_card_main)
