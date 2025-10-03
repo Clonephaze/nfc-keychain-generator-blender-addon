@@ -489,24 +489,28 @@ class OBJECT_OT_nfc_generate_qr(Operator):
             ssid = settings["wifi_ssid"]
             if not ssid.strip():
                 return None, "Please enter WiFi network name (SSID)"
-            qr_params.update({
-                "ssid": ssid,
-                "password": settings["wifi_password"],
-                "security": settings["wifi_security"],
-                "hidden": settings["wifi_hidden"],
-            })
+            qr_params.update(
+                {
+                    "ssid": ssid,
+                    "password": settings["wifi_password"],
+                    "security": settings["wifi_security"],
+                    "hidden": settings["wifi_hidden"],
+                }
+            )
 
         elif qr_type == "CONTACT":
             name = settings["contact_name"]
             if not name.strip():
                 return None, "Please enter contact name"
-            qr_params.update({
-                "name": name,
-                "phone": settings["contact_phone"],
-                "email": settings["contact_email"],
-                "url": settings["contact_url"],
-                "org": settings["contact_org"],
-            })
+            qr_params.update(
+                {
+                    "name": name,
+                    "phone": settings["contact_phone"],
+                    "email": settings["contact_email"],
+                    "url": settings["contact_url"],
+                    "org": settings["contact_org"],
+                }
+            )
 
         return qr_params, None
 
@@ -551,9 +555,12 @@ class OBJECT_OT_nfc_generate_qr(Operator):
 
             print(f"[QR Debug] Custom SVG created with {qr_size}x{qr_size} modules")
             print("[QR Debug] Processing SVG through proper pipeline...")
-            
+
             from . import svg_import
-            success = svg_import.process_svg_to_mesh(temp_svg_path, self.design_num, self.report)
+
+            success = svg_import.process_svg_to_mesh(
+                temp_svg_path, self.design_num, self.report
+            )
 
             if success:
                 print("[QR Debug] QR SVG processed successfully!")

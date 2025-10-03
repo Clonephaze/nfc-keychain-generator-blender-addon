@@ -15,20 +15,20 @@ from bpy.types import Operator
 def _process_mesh_geometry(design_obj):
     """
     Process mesh geometry in edit mode with all operations batched together.
-    
+
     Args:
         design_obj: The mesh object to process
     """
     with bpy.context.temp_override():
         bpy.ops.object.mode_set(mode="EDIT")
-        
+
         bpy.ops.mesh.select_all(action="SELECT")
         bpy.ops.mesh.dissolve_limited()
 
         bpy.ops.mesh.extrude_region_move(TRANSFORM_OT_translate={"value": (0, 0, 0.6)})
 
         bpy.ops.mesh.select_all(action="DESELECT")
-        
+
         try:
             bpy.ops.mesh.select_interior_faces()
             bpy.ops.mesh.delete(type="FACE")
@@ -47,7 +47,7 @@ def _process_mesh_geometry(design_obj):
 def _find_logo_placer_node_group():
     """
     Find the Logo Placer node group with flexible name matching.
-    
+
     Returns:
         The Logo Placer node group, or None if not found
     """
@@ -61,11 +61,11 @@ def _find_logo_placer_node_group():
 def _find_design_input_node(node_group, design_num: int):
     """
     Find the design input node within a node group with flexible name matching.
-    
+
     Args:
         node_group: The node group to search in
         design_num: Which design slot (1 or 2) to find
-        
+
     Returns:
         The design input node, or None if not found
     """
@@ -99,7 +99,7 @@ def process_svg_to_mesh(filepath: str, design_num: int, report_func=None) -> boo
     orig_active = bpy.context.active_object
 
     start_time = time.time()
-    
+
     try:
         bpy.ops.object.select_all(action="DESELECT")
         objects_before = set(bpy.context.scene.objects)
@@ -125,17 +125,17 @@ def process_svg_to_mesh(filepath: str, design_num: int, report_func=None) -> boo
                 return False
 
         bpy.ops.object.select_all(action="DESELECT")
-        
+
         curve_objects = []
         mesh_objects = []
-        
+
         for obj in imported_curves:
             if obj.type == "CURVE":
                 obj.select_set(True)
                 curve_objects.append(obj)
             elif obj.type == "MESH":
                 mesh_objects.append(obj)
-        
+
         # WHY: Batch convert all curves at once for better performance
         if curve_objects:
             bpy.context.view_layer.objects.active = curve_objects[0]

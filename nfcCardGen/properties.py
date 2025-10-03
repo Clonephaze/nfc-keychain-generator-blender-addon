@@ -143,7 +143,9 @@ def update_scale_2(self, context):
 
 def update_nfc_cavity_height(self, context):
     """Update callback for nfc_cavity_height property."""
-    update_property(self, context, "nfc_cavity_height", "NFC_CAVITY_HEIGHT", self.nfc_cavity_height)
+    update_property(
+        self, context, "nfc_cavity_height", "NFC_CAVITY_HEIGHT", self.nfc_cavity_height
+    )
 
 
 class NFCCardProperties(PropertyGroup):
@@ -266,7 +268,7 @@ class NFCCardProperties(PropertyGroup):
         max=40,
         update=update_bevel_segment_count,
     )
-    
+
     # NFC Cavity type choice property
     nfc_cavity_choice: EnumProperty(
         name="NFC Cavity Shape",
@@ -274,12 +276,16 @@ class NFCCardProperties(PropertyGroup):
         items=[
             ("RECTANGLE", "Rectangle", "Rectangular NFC cavity"),
             ("CIRCLE", "Circle", "Circular NFC cavity"),
-            ("DOUBLE_CIRCLE", "Double Circle", "Two circular NFC cavities (Rectangular Shape Only)"),
+            (
+                "DOUBLE_CIRCLE",
+                "Double Circle",
+                "Two circular NFC cavities (Rectangular Shape Only)",
+            ),
         ],
         default="RECTANGLE",
         # No update callback - use operator buttons instead
     )
-    
+
     # NFC Cavity height property
     nfc_cavity_height: bpy.props.FloatProperty(
         name="NFC Cavity Height",

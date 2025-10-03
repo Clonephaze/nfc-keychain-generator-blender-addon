@@ -6,7 +6,6 @@ from the UI panel. These operators will append the pre-built geometry node setup
 and provide automation for SVG processing.
 """
 
-import math
 import os
 from typing import Set
 
@@ -87,7 +86,7 @@ class OBJECT_OT_scene_setup(Operator):
             self._setup_modifier_drivers(card_obj)
 
             # Set the view to a nice initial angle
-            bpy.ops.object.nfc_set_view(view_type='FULL')
+            bpy.ops.object.nfc_set_view(view_type="FULL")
 
             return {"FINISHED"}
 
@@ -291,11 +290,11 @@ def _set_enum_property_with_mapping(
     prop_name: str,
     enum_value: str,
     modifier_key: str,
-    value_map: dict
+    value_map: dict,
 ) -> Set[str]:
     """
     Helper function to set an enum property and update the corresponding modifier.
-    
+
     Args:
         context: Blender context
         operator: The operator calling this function (for reporting)
@@ -303,21 +302,21 @@ def _set_enum_property_with_mapping(
         enum_value: The enum string value (e.g., "CIRCLE")
         modifier_key: The key in MOD_OPT_MAPPING (e.g., "MAG_SHAPE")
         value_map: Dictionary mapping enum strings to integers
-    
+
     Returns:
         Set with operation result ('FINISHED' or 'CANCELLED')
     """
     ensure_scene_mode("OBJECT", report=operator.report)
-    
+
     print(f"Setting {prop_name} to: {enum_value}")
-    
+
     # Update the property
     setattr(context.scene.nfc_card_props, prop_name, enum_value)
-    
+
     # Convert enum to integer using the provided mapping
     int_value = value_map.get(enum_value, 0)
     print(f"Mapped value: {int_value}")
-    
+
     if update_modifier_option(modifier_key, int_value, operator.report):
         force_update_ui_and_geometry(context, prop_name)
         return {"FINISHED"}
@@ -401,159 +400,173 @@ class OBJECT_OT_nfc_set_cavity_shape(Operator):
             "DOUBLE_CIRCLE": 2,
         }
         return _set_enum_property_with_mapping(
-            context, self, "nfc_cavity_choice", self.shape_type, "NFC_CAVITY_CHOICE", cavity_shape_map
+            context,
+            self,
+            "nfc_cavity_choice",
+            self.shape_type,
+            "NFC_CAVITY_CHOICE",
+            cavity_shape_map,
         )
 
 
 class OBJECT_OT_nfc_set_view(Operator):
     """Set the 3D viewport to a specific view angle and frame the card"""
-    
+
     bl_idname = "object.nfc_set_view"
     bl_label = "Set View"
     bl_description = "Change the 3D viewport to focus on specific parts of the card"
-    bl_options = {'REGISTER', 'UNDO'}
-    
+    bl_options = {"REGISTER", "UNDO"}
+
     view_type: bpy.props.EnumProperty(
         name="View Type",
         items=[
-            ('FULL', "Full View", "Zoomed out full view of the card"),
-            ('TOP_ANGLE', "Top Angle", "Angled top view showing side"),
-            ('BOTTOM', "Bottom View", "View from bottom for magnets"),
-            ('SIDE', "Side View", "View from side"),
-            ('SIDE_XRAY', "Side X-Ray", "Side view with X-ray enabled"),
-            ('TOP', "Top View", "View from directly above"),
+            ("FULL", "Full View", "Zoomed out full view of the card"),
+            ("TOP_ANGLE", "Top Angle", "Angled top view showing side"),
+            ("BOTTOM", "Bottom View", "View from bottom for magnets"),
+            ("SIDE", "Side View", "View from side"),
+            ("SIDE_XRAY", "Side X-Ray", "Side view with X-ray enabled"),
+            ("TOP", "Top View", "View from directly above"),
         ],
-        default='FULL'
+        default="FULL",
     )
-    
+
     enable_xray: bpy.props.BoolProperty(
         name="Enable X-Ray",
         description="Enable X-ray mode for this view",
-        default=False
+        default=False,
     )
-    
+
     @classmethod
     def poll(cls, context) -> bool:
         """Only allow if scene is set up and Card object exists."""
         if not context.scene.nfc_card_props.scene_setup:
             return False
         return OBJECT_NAME in bpy.data.objects
-    
+
     def execute(self, context) -> Set[str]:
         """Set the 3D viewport to the specified view."""
         # Find the 3D view area
         area = None
         for a in context.screen.areas:
-            if a.type == 'VIEW_3D':
+            if a.type == "VIEW_3D":
                 area = a
                 break
-        
+
         if not area:
-            self.report({'WARNING'}, "No 3D View found")
-            return {'CANCELLED'}
-        
+            self.report({"WARNING"}, "No 3D View found")
+            return {"CANCELLED"}
+
         space = area.spaces.active
-        
+
         # Get the card object to frame it
         card_obj = bpy.data.objects.get(OBJECT_NAME)
-        
+
         if card_obj:
             # Select and make active
-            bpy.ops.object.select_all(action='DESELECT')
+            bpy.ops.object.select_all(action="DESELECT")
             card_obj.select_set(True)
             context.view_layer.objects.active = card_obj
-        
+
         # Set the view based on type
-        if self.view_type == 'TOP':
-            bpy.ops.view3d.view_axis(type='TOP')
+        if self.view_type == "TOP":
+            bpy.ops.view3d.view_axis(type="TOP")
             space.shading.show_xray = self.enable_xray
-            
-        elif self.view_type == 'TOP_ANGLE':
+
+        elif self.view_type == "TOP_ANGLE":
             # Set to top view first (numpad 7)
-            bpy.ops.view3d.view_axis(type='TOP')
+            bpy.ops.view3d.view_axis(type="TOP")
             # Rotate down twice (numpad 2, 2) - rotate the view to look down at an angle
-            bpy.ops.view3d.view_orbit(type='ORBITDOWN')
-            bpy.ops.view3d.view_orbit(type='ORBITDOWN')
+            bpy.ops.view3d.view_orbit(type="ORBITDOWN")
+            bpy.ops.view3d.view_orbit(type="ORBITDOWN")
             # Exit orthographic view (numpad 5)
             if not space.region_3d.is_perspective:
                 bpy.ops.view3d.view_persportho()
             space.shading.show_xray = self.enable_xray
-            
-        elif self.view_type == 'BOTTOM':
-            bpy.ops.view3d.view_axis(type='BOTTOM')
+
+        elif self.view_type == "BOTTOM":
+            bpy.ops.view3d.view_axis(type="BOTTOM")
             space.shading.show_xray = self.enable_xray
-            
-        elif self.view_type == 'SIDE':
-            bpy.ops.view3d.view_axis(type='FRONT')
+
+        elif self.view_type == "SIDE":
+            bpy.ops.view3d.view_axis(type="FRONT")
             space.shading.show_xray = self.enable_xray
-            
-        elif self.view_type == 'SIDE_XRAY':
-            bpy.ops.view3d.view_axis(type='FRONT')
+
+        elif self.view_type == "SIDE_XRAY":
+            bpy.ops.view3d.view_axis(type="FRONT")
             space.shading.show_xray = True
-            
-        elif self.view_type == 'FULL':
+
+        elif self.view_type == "FULL":
             # Set to a nice angled view
-            bpy.ops.view3d.view_axis(type='TOP')
-            bpy.ops.view3d.view_orbit(type='ORBITDOWN')
-            bpy.ops.view3d.view_orbit(type='ORBITDOWN')
+            bpy.ops.view3d.view_axis(type="TOP")
+            bpy.ops.view3d.view_orbit(type="ORBITDOWN")
+            bpy.ops.view3d.view_orbit(type="ORBITDOWN")
             space.shading.show_xray = False
-        
+
         # Frame the selected object
         if card_obj:
             bpy.ops.view3d.view_selected()
-        
-        return {'FINISHED'}
+
+        return {"FINISHED"}
 
 
 class OBJECT_OT_nfc_export_stl(Operator, ExportHelper):
     """Export the NFC card to STL format for 3D printing"""
-    
+
     bl_idname = "object.nfc_export_stl"
     bl_label = "Export STL"
     bl_description = "Export the NFC card as an STL file for 3D printing"
-    bl_options = {'REGISTER', 'UNDO'}
-    
+    bl_options = {"REGISTER", "UNDO"}
+
     # ExportHelper mixin class uses this
     filename_ext = ".stl"
     filter_glob: StringProperty(
         default="*.stl",
-        options={'HIDDEN'},
+        options={"HIDDEN"},
         maxlen=255,
     )
-    
+
     def execute(self, context):
         """Execute the STL export operation."""
         try:
             # Get the final card object
             card_obj = None
             for obj in bpy.context.scene.objects:
-                if obj.name.lower() == "card" or obj.name.startswith("FinalCardTag") or obj.name == "CardTag":
+                if (
+                    obj.name.lower() == "card"
+                    or obj.name.startswith("FinalCardTag")
+                    or obj.name == "CardTag"
+                ):
                     card_obj = obj
                     break
-            
+
             if not card_obj:
-                self.report({'ERROR'}, "No card object found to export. Generate a card first.")
-                return {'CANCELLED'}
-            
+                self.report(
+                    {"ERROR"}, "No card object found to export. Generate a card first."
+                )
+                return {"CANCELLED"}
+
             # Clear selection and select only the card object
-            bpy.ops.object.select_all(action='DESELECT')
+            bpy.ops.object.select_all(action="DESELECT")
             card_obj.select_set(True)
             bpy.context.view_layer.objects.active = card_obj
-            
+
             # Export to STL using the native Blender STL exporter
             bpy.ops.wm.stl_export(
                 filepath=self.filepath,
                 export_selected_objects=True,
                 global_scale=1.0,
-                apply_modifiers=True
+                apply_modifiers=True,
             )
-            
-            self.report({'INFO'}, f"STL exported successfully to: {os.path.basename(self.filepath)}")
-            return {'FINISHED'}
-            
+
+            self.report(
+                {"INFO"},
+                f"STL exported successfully to: {os.path.basename(self.filepath)}",
+            )
+            return {"FINISHED"}
+
         except Exception as e:
-            self.report({'ERROR'}, f"STL export failed: {str(e)}")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, f"STL export failed: {str(e)}")
+            return {"CANCELLED"}
 
 
 CLASSES = (

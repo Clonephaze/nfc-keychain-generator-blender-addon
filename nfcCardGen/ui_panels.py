@@ -52,9 +52,11 @@ class VIEW3D_PT_tag_card_shape(Panel):
 
         # View control button
         view_box = layout.box()
-        view_box.label(text="View:", icon='VIEW3D')
-        view_op = view_box.operator("object.nfc_set_view", text="Top/Side View", icon='AXIS_TOP')
-        view_op.view_type = 'TOP_ANGLE'
+        view_box.label(text="View:", icon="VIEW3D")
+        view_op = view_box.operator(
+            "object.nfc_set_view", text="Top/Side View", icon="AXIS_TOP"
+        )
+        view_op.view_type = "TOP_ANGLE"
 
         layout.separator()
 
@@ -163,17 +165,19 @@ class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
 
         # View control buttons
         view_box = layout.box()
-        view_box.label(text="View:", icon='VIEW3D')
+        view_box.label(text="View:", icon="VIEW3D")
         row = view_box.row(align=True)
-        
+
         # Side X-Ray view for cutout
-        side_op = row.operator("object.nfc_set_view", text="Side (X-Ray)", icon='XRAY')
-        side_op.view_type = 'SIDE_XRAY'
-        
+        side_op = row.operator("object.nfc_set_view", text="Side (X-Ray)", icon="XRAY")
+        side_op.view_type = "SIDE_XRAY"
+
         # Bottom view for magnets
         if props.magnet_choice:
-            bottom_op = row.operator("object.nfc_set_view", text="Bottom", icon='AXIS_TOP')
-            bottom_op.view_type = 'BOTTOM'
+            bottom_op = row.operator(
+                "object.nfc_set_view", text="Bottom", icon="AXIS_TOP"
+            )
+            bottom_op.view_type = "BOTTOM"
 
         layout.separator()
 
@@ -218,11 +222,11 @@ class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
     def _draw_nfc_cavity_section(self, layout, props) -> None:
         """Draw the NFC cavity settings section."""
         layout.label(text="NFC Cavity Settings:")
-        
+
         # Cavity shape buttons
         layout.label(text="Cavity Shape:")
         row = layout.row(align=True)
-        
+
         # Rectangle button
         rect_op = row.operator(
             "object.nfc_set_cavity_shape",
@@ -230,7 +234,7 @@ class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
             depress=(props.nfc_cavity_choice == "RECTANGLE"),
         )
         rect_op.shape_type = "RECTANGLE"
-        
+
         # Circle button
         circle_op = row.operator(
             "object.nfc_set_cavity_shape",
@@ -238,7 +242,7 @@ class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
             depress=(props.nfc_cavity_choice == "CIRCLE"),
         )
         circle_op.shape_type = "CIRCLE"
-        
+
         # Double Circle button (only for rectangle shapes)
         if props.shape_preset == "RECTANGLE":
             double_op = row.operator(
@@ -247,7 +251,7 @@ class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
                 depress=(props.nfc_cavity_choice == "DOUBLE_CIRCLE"),
             )
             double_op.shape_type = "DOUBLE_CIRCLE"
-        
+
         layout.prop(props, "nfc_cavity_height", text="Cavity Height")
 
 
@@ -282,16 +286,16 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
 
         # View control buttons
         view_box = layout.box()
-        view_box.label(text="View:", icon='VIEW3D')
+        view_box.label(text="View:", icon="VIEW3D")
         row = view_box.row(align=True)
-        
+
         # Top view to see design
-        top_op = row.operator("object.nfc_set_view", text="Top", icon='AXIS_TOP')
-        top_op.view_type = 'TOP'
-        
+        top_op = row.operator("object.nfc_set_view", text="Top", icon="AXIS_TOP")
+        top_op.view_type = "TOP"
+
         # Side view to see inset/outset
-        side_op = row.operator("object.nfc_set_view", text="Side", icon='AXIS_SIDE')
-        side_op.view_type = 'SIDE'
+        side_op = row.operator("object.nfc_set_view", text="Side", icon="AXIS_SIDE")
+        side_op.view_type = "SIDE"
 
         layout.separator()
 
