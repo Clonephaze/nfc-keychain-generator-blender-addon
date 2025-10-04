@@ -365,6 +365,9 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
             box.prop(props, f"qr_contact_url_{design_num}", text="URL")
             box.prop(props, f"qr_contact_org_{design_num}", text="Organization")
         box.prop(props, f"qr_error_correction_{design_num}", text="Error Correction")
+        
+        # Advanced QR styling options
+        self._draw_qr_advanced_options(box, props, design_num)
 
     def _draw_qr_generate_button(self, box, props, design_num: int) -> None:
         if self._has_design(props, design_num):
@@ -391,6 +394,21 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
         col.prop(props, f"scale_{design_num}", text="Scale")
         col.prop(props, f"offset_x_{design_num}", text="X Offset")
         col.prop(props, f"offset_y_{design_num}", text="Y Offset")
+    
+    def _draw_qr_advanced_options(self, box, props, design_num: int) -> None:
+        """Draw advanced QR code styling options in a collapsible section."""
+        # Create a collapsible box for advanced options
+        advanced_box = box.box()
+        col = advanced_box.column(align=True)
+        col.label(text="Advanced QR Styling:", icon='SETTINGS')
+        
+        # Module (data pixels) style
+        col.label(text="Pattern Shape:")
+        col.prop(props, f"qr_module_style_{design_num}", text="")
+        
+        # Finder/Marker pattern center style
+        col.label(text="Marker Shape:")
+        col.prop(props, f"qr_finder_style_{design_num}", text="")
 
 
 class VIEW3D_PT_tag_card_export(Panel):

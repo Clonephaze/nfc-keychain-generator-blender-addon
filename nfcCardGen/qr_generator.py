@@ -14,6 +14,7 @@ from typing import Optional
 
 import bmesh
 import bpy
+import numpy as np
 from bpy.types import Material, Object, Operator
 
 try:
@@ -419,6 +420,14 @@ class OBJECT_OT_nfc_toggle_qr_mode(Operator):
         return {"FINISHED"}
 
 
+# QR Code Shape Styling Constants
+SQUIRCLE_MAGIC_K = 0.85  # Cubic Bézier control point multiplier for super-ellipse approximation
+MODULE_SCALE_FACTOR = 0.9  # Scale down modules slightly for visual separation
+FINDER_PATTERN_SIZE = 7  # Finder patterns are 7x7 modules
+FINDER_CENTER_SIZE = 3  # Finder pattern centers are 3x3 modules
+ROUNDED_CORNER_RADIUS = 0.3  # Corner radius for rounded adaptive style (fraction of module size)
+
+
 class OBJECT_OT_nfc_generate_qr(Operator):
     """Generate a QR code and process it through the SVG pipeline"""
 
@@ -526,14 +535,10 @@ class OBJECT_OT_nfc_generate_qr(Operator):
             self.report({"ERROR"}, error_msg)
             return {"CANCELLED"}
 
-        print(f"[QR Debug] Generating {qr_type} QR code with params: {qr_params}")
         qr_code = QRCodeGenerator.generate_qr_by_type(qr_type, **qr_params)
         if not qr_code:
-            print("[QR Debug] Failed to generate QR code object")
             self.report({"ERROR"}, f"Failed to generate {qr_type} QR code")
             return {"CANCELLED"}
-
-        print(f"[QR Debug] QR code generated successfully, version: {qr_code.version}")
 
         try:
             with tempfile.NamedTemporaryFile(
@@ -541,20 +546,11 @@ class OBJECT_OT_nfc_generate_qr(Operator):
             ) as temp_file:
                 temp_svg_path = temp_file.name
 
-            print(f"[QR Debug] Temporary SVG path: {temp_svg_path}")
-            print("[QR Debug] Creating custom SVG with filled rectangles...")
-
             matrix = [list(row) for row in qr_code.matrix]
-            qr_size = len(matrix)
-            module_size = 1.0
-
-            svg_content = self._create_qr_svg(matrix, qr_size, module_size)
+            svg_content = self._create_qr_svg(matrix, len(matrix), 1.0)
 
             with open(temp_svg_path, "w") as f:
                 f.write(svg_content)
-
-            print(f"[QR Debug] Custom SVG created with {qr_size}x{qr_size} modules")
-            print("[QR Debug] Processing SVG through proper pipeline...")
 
             from . import svg_import
 
@@ -563,24 +559,20 @@ class OBJECT_OT_nfc_generate_qr(Operator):
             )
 
             if success:
-                print("[QR Debug] QR SVG processed successfully!")
                 if self.design_num == 1:
                     props.has_design_1 = True
                 else:
                     props.has_design_2 = True
             else:
-                print("[QR Debug] Failed to process QR SVG")
                 self.report({"ERROR"}, "Failed to process QR code SVG")
                 return {"CANCELLED"}
 
             try:
                 os.unlink(temp_svg_path)
-                print("[QR Debug] Temporary file cleaned up")
             except Exception:
-                print("[QR Debug] Failed to clean up temporary file")
+                pass
 
         except Exception as e:
-            print(f"[QR Debug] Exception during QR generation: {e}")
             traceback.print_exc()
             self.report({"ERROR"}, f"Failed to generate QR code: {str(e)}")
             return {"CANCELLED"}
@@ -588,24 +580,232 @@ class OBJECT_OT_nfc_generate_qr(Operator):
         return {"FINISHED"}
 
     def _create_qr_svg(self, matrix, qr_size: int, module_size: float) -> str:
-        """Helper to create SVG content from QR matrix."""
+        """Create SVG content from QR matrix with custom styling."""
+        props = bpy.context.scene.nfc_card_props
+        
+        if self.design_num == 1:
+            module_style = props.qr_module_style_1
+            finder_style = props.qr_finder_style_1
+        else:
+            module_style = props.qr_module_style_2
+            finder_style = props.qr_finder_style_2
+        
+        finder_border_style = self._determine_border_style(finder_style)
         svg_width = qr_size * module_size
         svg_height = qr_size * module_size
-
-        # No white background - only black modules for proper SVG import
+        finder_positions = self._get_finder_positions(qr_size)
+        
+        # Pre-analyze neighbors for rounded style (batch operation)
+        corner_map = {}
+        if module_style == "ROUNDED":
+            corner_map = self._analyze_neighbors(matrix)
+        
         svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="{svg_height}" viewBox="0 0 {svg_width} {svg_height}">
 '''
+        
+        for finder_pos in finder_positions:
+            svg_content += self._create_finder_pattern(
+                finder_pos, module_size, finder_style, finder_border_style
+            )
 
         for row_idx, row in enumerate(matrix):
             for col_idx, is_dark in enumerate(row):
-                if is_dark:
+                if is_dark and not self._is_in_finder_area(row_idx, col_idx, finder_positions):
                     x = col_idx * module_size
                     y = row_idx * module_size
-                    svg_content += f'<rect x="{x}" y="{y}" width="{module_size}" height="{module_size}" fill="black"/>\n'
+                    
+                    # Pass corner info for rounded style
+                    corners = corner_map.get((row_idx, col_idx), None)
+                    svg_content += self._create_shape(x, y, module_size, module_style, corners)
 
         svg_content += "</svg>"
         return svg_content
+    
+    def _determine_border_style(self, finder_style: str) -> str:
+        """Determine border style based on finder center style."""
+        if finder_style in ("SQUARE", "CIRCLE"):
+            return finder_style
+        return "SQUIRCLE"
+    
+    def _get_finder_positions(self, qr_size: int) -> list:
+        """Get positions of the three finder patterns."""
+        offset = FINDER_PATTERN_SIZE // 2
+        return [
+            {"row": offset, "col": offset},
+            {"row": offset, "col": qr_size - offset - 1},
+            {"row": qr_size - offset - 1, "col": offset},
+        ]
+    
+    def _is_in_finder_area(self, row: int, col: int, finder_positions: list) -> bool:
+        """Check if a module is within any finder pattern area."""
+        half_size = FINDER_PATTERN_SIZE // 2
+        for finder in finder_positions:
+            if (abs(row - finder["row"]) <= half_size and 
+                abs(col - finder["col"]) <= half_size):
+                return True
+        return False
+    
+    def _analyze_neighbors(self, matrix) -> dict:
+        """Analyze QR matrix to determine which corners should be rounded.
+        
+        Uses NumPy array slicing for efficient neighbor detection.
+        Returns dict mapping (row, col) to rounded corner flags.
+        """
+        arr = np.array(matrix, dtype=bool)
+        height, width = arr.shape
+        padded = np.pad(arr, pad_width=1, mode='constant', constant_values=False)
+        
+        north = padded[:-2, 1:-1]
+        south = padded[2:, 1:-1]
+        west = padded[1:-1, :-2]
+        east = padded[1:-1, 2:]
+        
+        corners = {}
+        filled = np.argwhere(arr)
+        
+        for row, col in filled:
+            round_corners = {
+                'tl': not north[row, col] and not west[row, col],
+                'tr': not north[row, col] and not east[row, col],
+                'br': not south[row, col] and not east[row, col],
+                'bl': not south[row, col] and not west[row, col],
+            }
+            if any(round_corners.values()):
+                corners[(row, col)] = round_corners
+        
+        return corners
+    
+    def _create_rounded_rect_path(self, x: float, y: float, size: float, 
+                                   round_corners: dict) -> str:
+        """Create SVG path for rectangle with adaptive rounded corners."""
+        r = size * ROUNDED_CORNER_RADIUS
+        start_x = x + (r if round_corners['tl'] else 0)
+        
+        path = f'M {start_x},{y} '
+        
+        if round_corners['tr']:
+            path += f'L {x + size - r},{y} Q {x + size},{y} {x + size},{y + r} '
+        else:
+            path += f'L {x + size},{y} '
+        
+        if round_corners['br']:
+            path += f'L {x + size},{y + size - r} Q {x + size},{y + size} {x + size - r},{y + size} '
+        else:
+            path += f'L {x + size},{y + size} '
+        
+        if round_corners['bl']:
+            path += f'L {x + r},{y + size} Q {x},{y + size} {x},{y + size - r} '
+        else:
+            path += f'L {x},{y + size} '
+        
+        if round_corners['tl']:
+            path += f'L {x},{y + r} Q {x},{y} {x + r},{y} '
+        else:
+            path += f'L {x},{y} '
+        
+        path += 'z'
+        return path
+    
+    def _create_squircle_path(self, cx: float, cy: float, size: float) -> str:
+        """Generate SVG path for a squircle (super-ellipse)."""
+        half = size / 2
+        d = half * SQUIRCLE_MAGIC_K
+        
+        path = f'M {cx},{cy - half} '
+        path += f'C {cx + d},{cy - half} {cx + half},{cy - d} {cx + half},{cy} '
+        path += f'C {cx + half},{cy + d} {cx + d},{cy + half} {cx},{cy + half} '
+        path += f'C {cx - d},{cy + half} {cx - half},{cy + d} {cx - half},{cy} '
+        path += f'C {cx - half},{cy - d} {cx - d},{cy - half} {cx},{cy - half} z'
+        return path
+    
+    def _create_finder_pattern(self, finder_pos: dict, module_size: float, 
+                                center_style: str, border_style: str) -> str:
+        """Create a complete finder pattern as cohesive shapes."""
+        row = finder_pos["row"]
+        col = finder_pos["col"]
+        half_size = FINDER_PATTERN_SIZE // 2
+        half_center = FINDER_CENTER_SIZE // 2
+        
+        center_x = (col - half_center) * module_size
+        center_y = (row - half_center) * module_size
+        center_size = FINDER_CENTER_SIZE * module_size
+        
+        border_x = (col - half_size) * module_size
+        border_y = (row - half_size) * module_size
+        border_outer_size = FINDER_PATTERN_SIZE * module_size
+        border_inner_size = (FINDER_PATTERN_SIZE - 2) * module_size
+        border_inner_x = border_x + module_size
+        border_inner_y = border_y + module_size
+        
+        svg_content = ""
+        
+        if border_style == "SQUARE":
+            svg_content += '<path fill-rule="evenodd" fill="black" d="'
+            svg_content += f'M {border_x},{border_y} h {border_outer_size} v {border_outer_size} h -{border_outer_size} z '
+            svg_content += f'M {border_inner_x},{border_inner_y} h {border_inner_size} v {border_inner_size} h -{border_inner_size} z'
+            svg_content += '"/>\n'
+            
+        elif border_style == "CIRCLE":
+            cx = border_x + border_outer_size / 2
+            cy = border_y + border_outer_size / 2
+            outer_r = border_outer_size / 2
+            inner_r = border_inner_size / 2
+            svg_content += '<path fill-rule="evenodd" fill="black" d="'
+            svg_content += f'M {cx - outer_r},{cy} a {outer_r},{outer_r} 0 1,0 {outer_r * 2},0 a {outer_r},{outer_r} 0 1,0 -{outer_r * 2},0 z '
+            svg_content += f'M {cx - inner_r},{cy} a {inner_r},{inner_r} 0 1,1 {inner_r * 2},0 a {inner_r},{inner_r} 0 1,1 -{inner_r * 2},0 z'
+            svg_content += '"/>\n'
+            
+        elif border_style == "SQUIRCLE":
+            outer_cx = border_x + border_outer_size / 2
+            outer_cy = border_y + border_outer_size / 2
+            inner_cx = border_inner_x + border_inner_size / 2
+            inner_cy = border_inner_y + border_inner_size / 2
+            
+            svg_content += '<path fill-rule="evenodd" fill="black" d="'
+            svg_content += self._create_squircle_path(outer_cx, outer_cy, border_outer_size) + ' '
+            svg_content += self._create_squircle_path(inner_cx, inner_cy, border_inner_size)
+            svg_content += '"/>\n'
+        
+        svg_content += self._create_large_shape(center_x, center_y, center_size, center_style)
+        
+        return svg_content
+    
+    def _create_large_shape(self, x: float, y: float, size: float, style: str) -> str:
+        """Create a shape for finder pattern centers (3x3 area)."""
+        cx = x + size / 2
+        cy = y + size / 2
+        
+        if style == "SQUARE":
+            return f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
+        elif style == "CIRCLE":
+            return f'<circle cx="{cx}" cy="{cy}" r="{size / 2}" fill="black"/>\n'
+        elif style == "SQUIRCLE":
+            return f'<path fill="black" d="{self._create_squircle_path(cx, cy, size)}"/>\n'
+        
+        return f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
+    
+    def _create_shape(self, x: float, y: float, size: float, style: str, 
+                      round_corners: dict = None) -> str:
+        """Create an SVG shape for individual QR modules."""
+        cx = x + size / 2
+        cy = y + size / 2
+        
+        if style == "SQUARE":
+            return f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
+        elif style == "CIRCLE":
+            scaled_r = size / 2 * MODULE_SCALE_FACTOR
+            return f'<circle cx="{cx}" cy="{cy}" r="{scaled_r}" fill="black"/>\n'
+        elif style == "SQUIRCLE":
+            scaled_size = size * MODULE_SCALE_FACTOR
+            return f'<path fill="black" d="{self._create_squircle_path(cx, cy, scaled_size)}"/>\n'
+        elif style == "ROUNDED":
+            if round_corners and any(round_corners.values()):
+                return f'<path fill="black" d="{self._create_rounded_rect_path(x, y, size, round_corners)}"/>\n'
+            else:
+                return f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
+        
+        return f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
 
 
 def register() -> None:

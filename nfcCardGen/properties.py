@@ -642,6 +642,76 @@ class NFCCardProperties(PropertyGroup):
         update=update_scale_2,
     )
 
+    # QR Code Advanced Styling Options - Design 1
+    qr_module_style_1: bpy.props.EnumProperty(
+        name="QR Module Style 1",
+        description="Shape style for QR code data modules",
+        items=[
+            ("SQUARE", "Square", "Standard square modules"),
+            ("CIRCLE", "Circle", "Circular modules"),
+            ("SQUIRCLE", "Squircle", "Super-ellipse modules"),
+            ("ROUNDED", "Rounded", "Adaptive rounded corners for organic flow"),
+        ],
+        default="SQUARE",
+    )
+
+    qr_finder_style_1: bpy.props.EnumProperty(
+        name="QR Finder Style 1",
+        description="Shape style for QR code finder pattern centers",
+        items=[
+            ("SQUARE", "Square", "Standard square finder centers"),
+            ("CIRCLE", "Circle", "Circular finder centers"),
+            ("SQUIRCLE", "Squircle", "Super-ellipse finder centers"),
+        ],
+        default="SQUARE",
+    )
+
+    qr_finder_border_style_1: bpy.props.EnumProperty(
+        name="QR Finder Border Style 1",
+        description="Shape style for QR code finder pattern borders (auto-determined)",
+        items=[
+            ("SQUARE", "Square", "Square finder borders"),
+            ("CIRCLE", "Circle", "Circular finder borders"),
+            ("SQUIRCLE", "Squircle", "Super-ellipse finder borders"),
+        ],
+        default="SQUARE",
+    )
+
+    # QR Code Advanced Styling Options - Design 2
+    qr_module_style_2: bpy.props.EnumProperty(
+        name="QR Module Style 2",
+        description="Shape style for QR code data modules",
+        items=[
+            ("SQUARE", "Square", "Standard square modules"),
+            ("CIRCLE", "Circle", "Circular modules"),
+            ("SQUIRCLE", "Squircle", "Super-ellipse modules"),
+            ("ROUNDED", "Rounded", "Adaptive rounded corners for organic flow"),
+        ],
+        default="SQUARE",
+    )
+
+    qr_finder_style_2: bpy.props.EnumProperty(
+        name="QR Finder Style 2",
+        description="Shape style for QR code finder pattern centers",
+        items=[
+            ("SQUARE", "Square", "Standard square finder centers"),
+            ("CIRCLE", "Circle", "Circular finder centers"),
+            ("SQUIRCLE", "Squircle", "Super-ellipse finder centers"),
+        ],
+        default="SQUARE",
+    )
+
+    qr_finder_border_style_2: bpy.props.EnumProperty(
+        name="QR Finder Border Style 2",
+        description="Shape style for QR code finder pattern borders (auto-determined)",
+        items=[
+            ("SQUARE", "Square", "Square finder borders"),
+            ("CIRCLE", "Circle", "Circular finder borders"),
+            ("SQUIRCLE", "Squircle", "Super-ellipse finder borders"),
+        ],
+        default="SQUARE",
+    )
+
 
 def register() -> None:
     """Register property classes with Blender."""
