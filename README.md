@@ -1,68 +1,54 @@
-# NFC Card & Keychain Generator (Blender Add-on)
+# 3D-Printable & Customizable Tags, Cards, & Keychains
 
-## Project Overview
+NFC chips and QR codes are powerful tools – they can share your socials or contact card, let guests tap to join your Wi-Fi, or even trigger automations with a single scan. However on their own, NFC chips don’t look great, and a paper QR code isn’t much better.
 
-This Blender add-on makes it easy to design fully customizable, 3D-printable NFC cards and keychains. Combine practical features like NFC cavities, magnet slots, and QR codes with your own graphics or logos. Ideal for influencers sharing their socials, Wi-Fi share cards, branded giveaways, or just a conversation piece for your fridge.
+This add-on lets you design 3D-printable housings for NFC chips. You can add your own logos or icons (Wi-Fi symbol, social media logo, etc.), or use the built-in QR generator to put a backup code directly on the surface of the print.
 
 ---
 
-## Features
+## Main Features
 
-- **Shape Presets**: Rectangle or circle, with optional keychain loop
-- **Flexible Dimensions**: Control size, thickness, corner rounding, and bevel style
-- **Smart Cutouts**: Add an NFC slot (card or round tag) and magnet holes (circle or hex, with taper options)
-- **Graphics Integration**: Import custom SVG designs or generate QR codes on the fly (Wi-Fi, vCards, URLs, text)
-- **Multi-material Ready**: Inset designs for engraving or multi-color printing
-- **Live Updates**: All parameters update instantly using Geometry Nodes
-- **Export**: One-click STL export for printing
+* **Versatile shapes** – Cards, dots, or keychains with adjustable height, bevels, rounded corners, and optional magnet slots.  
+* **SVG support** – Import any SVG logo and turn it into an object on your housing, with the option to inset designs for flush multi-color prints.  
+* **QR fallback** – Generate QR codes for links, vCards, Wi-Fi details, or plain text and place them like any other logo.  
+* **Magnet slots** – Choose between hexagonal or circular cutouts, set width/height, and let the tool auto-adjust the housing height.  
+* **NFC optional** – Disable the NFC cutout to create solid cards or keychains without cavities.  
 
 ---
 
 ## Quickstart
 
-1. Open Blender and enable the add-on
-2. In the 3D Viewport sidebar, open the "NFC Cards" tab
-3. Click **Prep Scene** to initialize the geometry setup
-4. Choose a shape preset, adjust dimensions, and add optional NFC or magnet cutouts
-5. Import an SVG logo or generate a QR code in the Design panel
-6. Adjust placement, scale, and style of your design
-7. Export as STL for 3D printing
+1. Install and enable the add-on.  
+2. Open the **NFC Cards** tab in the N-panel (press `N` in the 3D Viewport).  
+3. Click **Prep Scene** to generate the base card and clear any interfering objects.  
+4. Choose shape, dimensions, and optional NFC or magnet cutouts.  
+5. Import an SVG logo or generate a QR code, adjusting scale and offsets as needed.  
+6. Export your customized housing as an STL ready for printing.  
 
 ---
 
-## Example Uses
+## Multi-Color Printing & NFC Slot Setup in Orca Slicer
 
-- A tap-to-join Wi-Fi card with QR backup for iPhone users
-- Custom keychains with your logo, handle, or contact details
-- NFC-enabled business cards linking to a portfolio or vCard
-- Branded or decorative fridge magnets
-
----
-
-## Installation
-
-After downloading `nfcCardGen.zip` drap the zip onto blenders window and confirm the addon installation. You can find the addon in the layout tab in the n-panel tab called "NFC Cards"
-
-## Requirements
-
-- Blender 4.2.0 or later
-- This addon zip
+1. Import the STL into Orca.  
+2. Right click the object > Split > to Parts (*not* to Objects).  
+3. In the left panel, open the **Objects** tab (next to **Process**). You’ll see a list of numbered objects.  
+4. Right click object 2 > Change Type > set to Negative Object.  
+5. For objects 3 and up, right click > Change Filament Type > assign your second color.  
+   - Optional: If the design is inset, flip the STL 180° for a cleaner top surface.  
+6. Slice and scrub the slider to the layer just before the NFC cavity gets covered. Right click > Add Pause.  
+7. Re-slice and save/send g-code to your printer.  
 
 ---
 
-## Advanced: Multi-Color Printing with Orca Slicer
+## Requirements & Manual Installation
 
-After exporting your STL, you can use [Orca Slicer](https://orcaslicer.com/) to split the model for color assignment:
+You need:  
+* Blender 4.2.0 or later  
 
-1. Import the STL into Orca
-2. Use "Split to Parts" (NOT "Split to Objects") to separate body and designs, OR you can choose to manually paint the parts yourself and skip to step 5.
-3. In the objects menu choose part 2, right click and change type, choose negative part
-4. Set object 1 to one color, set objects 3+ to your second color
-5. Adjust print settings for filament swaps or multi-material printing, the tool produces default measurements suited for .2 mm increments
-6. Slice and preview
-
-Tips:
-- Use the "Inset Designs" option in the add-on for clean multi-color regions, flip the card in your slicer for an even cleaner top surface!
+Manual install:  
+* Download `nfcCardGen.zip`.  
+* Drag and drop it into Blender, then enable the extension.  
+* Or go to **Edit > Preferences > Add-ons > Install from Disk**, select the zip, and enable it.  
 
 ---
 
@@ -74,5 +60,4 @@ GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 
 ## Support & Feedback
 
-For questions, issues, or feature requests, please visit the project repository or contact me at jack@clonecore.net.
-
+For questions, issues, or feature requests, please open an issue in the project repository or contact me at **jack@clonecore.net**.
