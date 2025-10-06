@@ -8,7 +8,6 @@ This module handles generating different types of QR codes using the segno libra
 """
 
 import os
-import tempfile
 import traceback
 from typing import Optional
 
@@ -30,6 +29,51 @@ except Exception as e:
     traceback.print_exc()
     segno = None
     helpers = None
+
+
+def _get_temp_svg_path(design_num: int) -> str:
+    """
+    Get a temporary SVG file path for QR code processing.
+    
+    Uses the extension's user directory with a unique filename to ensure proper permissions
+    and automatic cleanup. Files are intended to be deleted immediately after use.
+    
+    Args:
+        design_num: Which design slot this is for (1 or 2)
+        
+    Returns:
+        Full path to the temporary SVG file
+    """
+    import time
+    import random
+    
+    temp_dir = bpy.utils.extension_path_user(__package__, path="temp", create=True)
+    # Create unique filename with timestamp and random component to avoid conflicts
+    timestamp = int(time.time() * 1000)  # milliseconds
+    random_id = random.randint(1000, 9999)
+    filename = f"qr_design_{design_num}_{timestamp}_{random_id}.svg"
+    return os.path.join(temp_dir, filename)
+
+
+def _cleanup_old_temp_files() -> None:
+    """
+    Clean up any old temporary SVG files that may have been left behind.
+    
+    This is called during addon initialization to ensure no accumulation
+    of temporary files over time.
+    """
+    try:
+        temp_dir = bpy.utils.extension_path_user(__package__, path="temp", create=False)
+        if os.path.exists(temp_dir):
+            for filename in os.listdir(temp_dir):
+                if filename.startswith("qr_design_") and filename.endswith(".svg"):
+                    file_path = os.path.join(temp_dir, filename)
+                    try:
+                        os.unlink(file_path)
+                    except Exception:
+                        pass  # Ignore errors when cleaning up
+    except Exception:
+        pass  # Ignore errors if temp directory doesn't exist or can't be accessed
 
 
 class QRCodeGenerator:
@@ -541,10 +585,8 @@ class OBJECT_OT_nfc_generate_qr(Operator):
             return {"CANCELLED"}
 
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".svg", delete=False
-            ) as temp_file:
-                temp_svg_path = temp_file.name
+            # Get extension-specific temp file path for SVG processing
+            temp_svg_path = _get_temp_svg_path(self.design_num)
 
             matrix = [list(row) for row in qr_code.matrix]
             svg_content = self._create_qr_svg(matrix, len(matrix), 1.0)
@@ -567,8 +609,10 @@ class OBJECT_OT_nfc_generate_qr(Operator):
                 self.report({"ERROR"}, "Failed to process QR code SVG")
                 return {"CANCELLED"}
 
+            # Clean up temporary SVG file
             try:
-                os.unlink(temp_svg_path)
+                if os.path.exists(temp_svg_path):
+                    os.unlink(temp_svg_path)
             except Exception:
                 pass
 
@@ -814,6 +858,9 @@ def register() -> None:
             "Warning: segno library not available. QR code generation will be disabled."
         )
         print("To enable QR codes, install the segno wheel in the add-on directory.")
+
+    # Clean up any old temporary files from previous sessions
+    _cleanup_old_temp_files()
 
     bpy.utils.register_class(OBJECT_OT_nfc_toggle_qr_mode)
     bpy.utils.register_class(OBJECT_OT_nfc_generate_qr)
