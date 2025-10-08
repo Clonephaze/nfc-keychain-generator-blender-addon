@@ -13,7 +13,7 @@ blender_version_min = "4.2.0"
 
 # License and website information
 license = ['SPDX:GPL-3.0-or-later']
-website = "https://github.com/clonephaze/NFC-Card-Keychain-w--QR-or-Logo-Placer"
+website = "https://github.com/Clonephaze/nfc-keychain-generator-blender-addon"
 copyright = [
     "2025 Clonephaze",
 ]
@@ -26,7 +26,6 @@ tags = [
 	"User Interface",
 ]
 
-# Detailed description
 description = """
 A comprehensive add-on for generating customizable 3D-printable cards, tags, and keychains.
 
@@ -48,4 +47,4 @@ wheels = [
 ]
 
 [permissions]
-    "files" = "For custom SVG import and file saving operations"
+    files = "For custom SVG import and file saving operations"
