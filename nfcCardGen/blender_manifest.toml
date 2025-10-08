@@ -2,7 +2,7 @@
 schema_version = "1.0.0"
 # Basic add-on information
 id = "nfc_card_keychain_generator"
-version = "1.1.4"
+version = "1.1.5"
 name = "NFC Card and Keychain Generator"
 tagline = "Generate customizable 3D-printable cards, tags, and keychains"
 maintainer = "Clonephaze <jack@clonecore.net>"
