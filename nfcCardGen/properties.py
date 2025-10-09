@@ -422,6 +422,7 @@ class NFCCardProperties(PropertyGroup):
             ("TEXT", "Text/URL", "Text or URL QR code"),
             ("WIFI", "WiFi", "WiFi network QR code"),
             ("CONTACT", "vCard", "Contact information QR code"),
+            ("EMAIL", "Email", "Email message QR code"),
         ],
         default="TEXT",
     )
@@ -507,6 +508,37 @@ class NFCCardProperties(PropertyGroup):
         default="",
     )
 
+    # Email QR properties for Design 1
+    qr_email_to_1: bpy.props.StringProperty(
+        name="Email To 1",
+        description="Recipient email address for Design 1 email QR code",
+        default="",
+    )
+
+    qr_email_cc_1: bpy.props.StringProperty(
+        name="Email CC 1",
+        description="Carbon copy recipient(s) for Design 1 email QR code (comma-separated)",
+        default="",
+    )
+
+    qr_email_bcc_1: bpy.props.StringProperty(
+        name="Email BCC 1",
+        description="Blind carbon copy recipient(s) for Design 1 email QR code (comma-separated)",
+        default="",
+    )
+
+    qr_email_subject_1: bpy.props.StringProperty(
+        name="Email Subject 1",
+        description="Subject line for Design 1 email QR code",
+        default="",
+    )
+
+    qr_email_body_1: bpy.props.StringProperty(
+        name="Email Body 1",
+        description="Message body for Design 1 email QR code",
+        default="",
+    )
+
     # QR Code generation properties for Design 2
     qr_mode_2: bpy.props.BoolProperty(
         name="QR Mode 2",
@@ -521,6 +553,7 @@ class NFCCardProperties(PropertyGroup):
             ("TEXT", "Text/URL", "Text or URL QR code"),
             ("WIFI", "WiFi", "WiFi network QR code"),
             ("CONTACT", "vCard", "Contact information QR code"),
+            ("EMAIL", "Email", "Email message QR code"),
         ],
         default="TEXT",
     )
@@ -603,6 +636,37 @@ class NFCCardProperties(PropertyGroup):
     qr_contact_org_2: bpy.props.StringProperty(
         name="Contact Organization 2",
         description="Contact organization for Design 2 vCard QR code",
+        default="",
+    )
+
+    # Email QR properties for Design 2
+    qr_email_to_2: bpy.props.StringProperty(
+        name="Email To 2",
+        description="Recipient email address for Design 2 email QR code",
+        default="",
+    )
+
+    qr_email_cc_2: bpy.props.StringProperty(
+        name="Email CC 2",
+        description="Carbon copy recipient(s) for Design 2 email QR code (comma-separated)",
+        default="",
+    )
+
+    qr_email_bcc_2: bpy.props.StringProperty(
+        name="Email BCC 2",
+        description="Blind carbon copy recipient(s) for Design 2 email QR code (comma-separated)",
+        default="",
+    )
+
+    qr_email_subject_2: bpy.props.StringProperty(
+        name="Email Subject 2",
+        description="Subject line for Design 2 email QR code",
+        default="",
+    )
+
+    qr_email_body_2: bpy.props.StringProperty(
+        name="Email Body 2",
+        description="Message body for Design 2 email QR code",
         default="",
     )
 

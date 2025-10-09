@@ -5,6 +5,7 @@ This module handles generating different types of QR codes using the segno libra
 - Text/URL QR codes for general content
 - WiFi QR codes for network sharing
 - Contact (vCard) QR codes for contact information
+- Email QR codes for pre-filled email messages
 """
 
 import os
@@ -84,11 +85,13 @@ class QRCodeGenerator:
     - Text/URL QR codes for general content
     - WiFi QR codes for network credentials
     - Contact (vCard) QR codes for contact information
+    - Email QR codes for pre-filled email messages
     """
 
     QR_TYPE_TEXT = "TEXT"
     QR_TYPE_WIFI = "WIFI"
     QR_TYPE_CONTACT = "CONTACT"
+    QR_TYPE_EMAIL = "EMAIL"
 
     @staticmethod
     def is_segno_available() -> bool:
@@ -205,12 +208,65 @@ class QRCodeGenerator:
             return None
 
     @classmethod
+    def generate_email_qr(
+        cls,
+        to: str,
+        cc: str = "",
+        bcc: str = "",
+        subject: str = "",
+        body: str = "",
+        error_correction: str = "M",
+    ) -> Optional[segno.QRCode]:
+        """
+        Generate an email QR code using segno's email helper.
+
+        Args:
+            to: The email address (recipient).
+            cc: The carbon copy recipient (optional).
+            bcc: The blind carbon copy recipient (optional).
+            subject: The email subject (optional).
+            body: The message body (optional).
+            error_correction: Error correction level ('L', 'M', 'Q', 'H').
+
+        Returns:
+            Email QR code object, or None if generation failed.
+        """
+        if not cls.is_segno_available():
+            return None
+
+        try:
+            # Convert empty strings to None for optional parameters
+            cc_list = cc.split(',') if cc.strip() else None
+            bcc_list = bcc.split(',') if bcc.strip() else None
+            
+            # Clean up email lists by stripping whitespace
+            if cc_list:
+                cc_list = [email.strip() for email in cc_list if email.strip()]
+                cc_list = cc_list if cc_list else None
+            
+            if bcc_list:
+                bcc_list = [email.strip() for email in bcc_list if email.strip()]
+                bcc_list = bcc_list if bcc_list else None
+
+            qr = helpers.make_email(
+                to=to,
+                cc=cc_list,
+                bcc=bcc_list,
+                subject=subject or None,
+                body=body or None,
+            )
+            return qr
+        except Exception as e:
+            print(f"Email QR code generation failed: {e}")
+            return None
+
+    @classmethod
     def generate_qr_by_type(cls, qr_type: str, **kwargs) -> Optional[segno.QRCode]:
         """
         Generate QR code based on type with appropriate parameters.
 
         Args:
-            qr_type: Type of QR code ('TEXT', 'WIFI', 'CONTACT').
+            qr_type: Type of QR code ('TEXT', 'WIFI', 'CONTACT', 'EMAIL').
             **kwargs: Type-specific parameters.
 
         Returns:
@@ -236,6 +292,15 @@ class QRCodeGenerator:
                 email=kwargs.get("email", ""),
                 url=kwargs.get("url", ""),
                 org=kwargs.get("org", ""),
+                error_correction=kwargs.get("error_correction", "M"),
+            )
+        elif qr_type == cls.QR_TYPE_EMAIL:
+            return cls.generate_email_qr(
+                to=kwargs.get("to", ""),
+                cc=kwargs.get("cc", ""),
+                bcc=kwargs.get("bcc", ""),
+                subject=kwargs.get("subject", ""),
+                body=kwargs.get("body", ""),
                 error_correction=kwargs.get("error_correction", "M"),
             )
         else:
@@ -367,7 +432,7 @@ def generate_qr_for_card(qr_type: str, **qr_params) -> Optional[Object]:
     Convenience function to generate any type of QR code for card placement.
 
     Args:
-        qr_type: Type of QR code ('TEXT', 'WIFI', 'CONTACT').
+        qr_type: Type of QR code ('TEXT', 'WIFI', 'CONTACT', 'EMAIL').
         **qr_params: Type-specific parameters for QR generation.
 
     Returns:
@@ -511,6 +576,11 @@ class OBJECT_OT_nfc_generate_qr(Operator):
                 "contact_email": props.qr_contact_email_1,
                 "contact_url": props.qr_contact_url_1,
                 "contact_org": props.qr_contact_org_1,
+                "email_to": props.qr_email_to_1,
+                "email_cc": props.qr_email_cc_1,
+                "email_bcc": props.qr_email_bcc_1,
+                "email_subject": props.qr_email_subject_1,
+                "email_body": props.qr_email_body_1,
             }
         else:
             return {
@@ -526,6 +596,11 @@ class OBJECT_OT_nfc_generate_qr(Operator):
                 "contact_email": props.qr_contact_email_2,
                 "contact_url": props.qr_contact_url_2,
                 "contact_org": props.qr_contact_org_2,
+                "email_to": props.qr_email_to_2,
+                "email_cc": props.qr_email_cc_2,
+                "email_bcc": props.qr_email_bcc_2,
+                "email_subject": props.qr_email_subject_2,
+                "email_body": props.qr_email_body_2,
             }
 
     def _build_qr_params(self, qr_type: str, settings: dict):
@@ -562,6 +637,20 @@ class OBJECT_OT_nfc_generate_qr(Operator):
                     "email": settings["contact_email"],
                     "url": settings["contact_url"],
                     "org": settings["contact_org"],
+                }
+            )
+
+        elif qr_type == "EMAIL":
+            to_email = settings["email_to"]
+            if not to_email.strip():
+                return None, "Please enter recipient email address"
+            qr_params.update(
+                {
+                    "to": to_email,
+                    "cc": settings["email_cc"],
+                    "bcc": settings["email_bcc"],
+                    "subject": settings["email_subject"],
+                    "body": settings["email_body"],
                 }
             )
 

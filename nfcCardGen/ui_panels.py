@@ -262,7 +262,7 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
     - Choose whether to inset designs for multi-material printing.
     - Configure two design slots (Design 1 and Design 2, the latter only for rectangle shapes).
     - For each design slot, select between generating a QR code or importing a custom SVG.
-    - If QR mode is selected, choose the QR type (Text, WiFi, Contact) and provide relevant input fields.
+    - If QR mode is selected, choose the QR type (Text, WiFi, Contact, Email) and provide relevant input fields.
     - Set the QR error correction level and generate or regenerate the QR code.
     - If SVG mode is selected, import or replace the SVG design.
     - Adjust design settings such as scale and X/Y offset for imported designs.
@@ -364,6 +364,12 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
             box.prop(props, f"qr_contact_email_{design_num}", text="Email")
             box.prop(props, f"qr_contact_url_{design_num}", text="URL")
             box.prop(props, f"qr_contact_org_{design_num}", text="Organization")
+        elif qr_type == "EMAIL":
+            box.prop(props, f"qr_email_to_{design_num}", text="To")
+            box.prop(props, f"qr_email_cc_{design_num}", text="CC")
+            box.prop(props, f"qr_email_bcc_{design_num}", text="BCC")
+            box.prop(props, f"qr_email_subject_{design_num}", text="Subject")
+            box.prop(props, f"qr_email_body_{design_num}", text="Body")
         box.prop(props, f"qr_error_correction_{design_num}", text="Error Correction")
         
         # Advanced QR styling options

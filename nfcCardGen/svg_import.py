@@ -11,37 +11,79 @@ import time
 import bpy
 from bpy.types import Operator
 
-
 def _process_mesh_geometry(design_obj):
     """
-    Process mesh geometry in edit mode with all operations batched together.
+    Processes a flat plane mesh to make it a 0.6mm thick manifold mesh.
+        - In edit mode, select all and extrude by 0.6mm
+        - Select all, dissolve limited, and merge by distance
+        - Select all interior faces and delete them
+        - Second dissolve limited and recalculate normals outside
 
     Args:
         design_obj: The mesh object to process
     """
     with bpy.context.temp_override():
+        # In edit mode, select all and extrude
         bpy.ops.object.mode_set(mode="EDIT")
-
         bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.dissolve_limited()
-
         bpy.ops.mesh.extrude_region_move(TRANSFORM_OT_translate={"value": (0, 0, 0.6)})
 
+        # Select all, dissolve limited, and merge by distance
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.dissolve_limited()
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.remove_doubles()
+
+        # Select all interior faces and delete them
         bpy.ops.mesh.select_all(action="DESELECT")
+        bpy.ops.mesh.select_interior_faces()
+        bpy.ops.mesh.delete(type="FACE")
 
-        try:
-            bpy.ops.mesh.select_interior_faces()
-            bpy.ops.mesh.delete(type="FACE")
-        except Exception:
-            bpy.ops.mesh.select_non_manifold()
-            bpy.ops.mesh.delete(type="FACE")
-
+        # Second dissolve limited and recalculate normals outside
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.dissolve_limited()
         bpy.ops.mesh.select_all(action="SELECT")
         bpy.ops.mesh.normals_make_consistent(inside=False)
 
-        bpy.ops.mesh.remove_doubles()
-
         bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def _check_mesh_manifold(design_obj) -> tuple[bool, int]:
+    """
+    Check if a mesh is manifold (has no non-manifold geometry).
+    
+    Args:
+        design_obj: The mesh object to check
+        
+    Returns:
+        Tuple of (is_manifold: bool, non_manifold_count: int)
+    """
+    # Ensure we're in object mode
+    if bpy.context.active_object and bpy.context.active_object.mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode='OBJECT')
+    
+    # Select the object and enter edit mode
+    bpy.ops.object.select_all(action='DESELECT')
+    design_obj.select_set(True)
+    bpy.context.view_layer.objects.active = design_obj
+    bpy.ops.object.mode_set(mode='EDIT')
+    
+    # Deselect all first
+    bpy.ops.mesh.select_all(action='DESELECT')
+    
+    # Select non-manifold geometry
+    bpy.ops.mesh.select_non_manifold()
+    
+    # Switch to object mode to read the selection
+    bpy.ops.object.mode_set(mode='OBJECT')
+    
+    # Count selected vertices (non-manifold elements)
+    mesh = design_obj.data
+    non_manifold_count = sum(1 for v in mesh.vertices if v.select)
+    
+    is_manifold = non_manifold_count == 0
+    
+    return is_manifold, non_manifold_count
 
 
 def _find_logo_placer_node_group():
@@ -169,6 +211,20 @@ def process_svg_to_mesh(filepath: str, design_num: int, report_func=None) -> boo
 
         # WHY: Batch all mesh operations to minimize expensive viewport updates
         _process_mesh_geometry(design_obj)
+
+        # Check if the mesh is manifold after processing
+        is_manifold, non_manifold_count = _check_mesh_manifold(design_obj)
+        if not is_manifold:
+            if report_func:
+                report_func(
+                    {'ERROR'}, 
+                    f"SVG processing resulted in non-manifold geometry ({non_manifold_count} problematic vertices). "
+                    "This lacks real paths to create a clean mesh, it's likely the svg is only 1D lines. "
+                    "Try fixing the SVG to use real paths, or use a different design."
+                )
+            # Clean up the failed object
+            bpy.data.objects.remove(design_obj, do_unlink=True)
+            return False
 
         bpy.ops.object.origin_set(type="ORIGIN_CENTER_OF_MASS", center="MEDIAN")
 
