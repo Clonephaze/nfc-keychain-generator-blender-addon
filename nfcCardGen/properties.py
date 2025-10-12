@@ -711,34 +711,35 @@ class NFCCardProperties(PropertyGroup):
         name="QR Module Style 1",
         description="Shape style for QR code data modules",
         items=[
-            ("SQUARE", "Square", "Standard square modules"),
+            # NOTE: SQUARE option removed - causes non-manifold geometry issues with BMesh processing
+            # ("SQUARE", "Square", "Standard square modules"),
+            ("ROUNDED", "Rounded", "Adaptive rounded corners for organic flow"),
             ("CIRCLE", "Circle", "Circular modules"),
             ("SQUIRCLE", "Squircle", "Super-ellipse modules"),
-            ("ROUNDED", "Rounded", "Adaptive rounded corners for organic flow"),
         ],
-        default="SQUARE",
+        default="ROUNDED",  # Changed from SQUARE - more reliable with BMesh processing
     )
 
     qr_finder_style_1: bpy.props.EnumProperty(
         name="QR Finder Style 1",
         description="Shape style for QR code finder pattern centers",
         items=[
+            ("SQUIRCLE", "Squircle", "Super-ellipse finder centers"),
             ("SQUARE", "Square", "Standard square finder centers"),
             ("CIRCLE", "Circle", "Circular finder centers"),
-            ("SQUIRCLE", "Squircle", "Super-ellipse finder centers"),
         ],
-        default="SQUARE",
+        default="SQUIRCLE",  # Changed from SQUARE - better default while keeping option available
     )
 
     qr_finder_border_style_1: bpy.props.EnumProperty(
         name="QR Finder Border Style 1",
         description="Shape style for QR code finder pattern borders (auto-determined)",
         items=[
+            ("SQUIRCLE", "Squircle", "Super-ellipse finder borders"),
             ("SQUARE", "Square", "Square finder borders"),
             ("CIRCLE", "Circle", "Circular finder borders"),
-            ("SQUIRCLE", "Squircle", "Super-ellipse finder borders"),
         ],
-        default="SQUARE",
+        default="SQUIRCLE",  # Changed from SQUARE - better default while keeping option available
     )
 
     # QR Code Advanced Styling Options - Design 2
@@ -746,34 +747,35 @@ class NFCCardProperties(PropertyGroup):
         name="QR Module Style 2",
         description="Shape style for QR code data modules",
         items=[
-            ("SQUARE", "Square", "Standard square modules"),
+            # NOTE: SQUARE option removed - causes non-manifold geometry issues with BMesh processing
+            # ("SQUARE", "Square", "Standard square modules"),
+            ("ROUNDED", "Rounded", "Adaptive rounded corners for organic flow"),
             ("CIRCLE", "Circle", "Circular modules"),
             ("SQUIRCLE", "Squircle", "Super-ellipse modules"),
-            ("ROUNDED", "Rounded", "Adaptive rounded corners for organic flow"),
         ],
-        default="SQUARE",
+        default="ROUNDED",  # Changed from SQUARE - more reliable with BMesh processing
     )
 
     qr_finder_style_2: bpy.props.EnumProperty(
         name="QR Finder Style 2",
         description="Shape style for QR code finder pattern centers",
         items=[
+            ("SQUIRCLE", "Squircle", "Super-ellipse finder centers"),
             ("SQUARE", "Square", "Standard square finder centers"),
             ("CIRCLE", "Circle", "Circular finder centers"),
-            ("SQUIRCLE", "Squircle", "Super-ellipse finder centers"),
         ],
-        default="SQUARE",
+        default="SQUIRCLE",  # Changed from SQUARE - better default while keeping option available
     )
 
     qr_finder_border_style_2: bpy.props.EnumProperty(
         name="QR Finder Border Style 2",
         description="Shape style for QR code finder pattern borders (auto-determined)",
         items=[
+            ("SQUIRCLE", "Squircle", "Super-ellipse finder borders"),
             ("SQUARE", "Square", "Square finder borders"),
             ("CIRCLE", "Circle", "Circular finder borders"),
-            ("SQUIRCLE", "Squircle", "Super-ellipse finder borders"),
         ],
-        default="SQUARE",
+        default="SQUIRCLE",  # Changed from SQUARE - better default while keeping option available
     )
 
 

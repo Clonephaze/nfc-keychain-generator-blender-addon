@@ -8,8 +8,11 @@ geometry node setup.
 
 import time
 
+import bmesh
 import bpy
 from bpy.types import Operator
+from mathutils import Matrix
+
 
 def _process_mesh_geometry(design_obj):
     """
@@ -22,67 +25,294 @@ def _process_mesh_geometry(design_obj):
     Args:
         design_obj: The mesh object to process
     """
-    with bpy.context.temp_override():
-        # In edit mode, select all and extrude
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.extrude_region_move(TRANSFORM_OT_translate={"value": (0, 0, 0.6)})
 
-        # Select all, dissolve limited, and merge by distance
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.dissolve_limited()
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.remove_doubles()
+    mesh = design_obj.data
+    mesh.calc_loop_triangles()
 
-        # Select all interior faces and delete them
-        bpy.ops.mesh.select_all(action="DESELECT")
-        bpy.ops.mesh.select_interior_faces()
-        bpy.ops.mesh.delete(type="FACE")
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    faces = bm.faces[:]
+    ANGLE = 0.084726646  # ~5 degrees in radians
 
-        # Second dissolve limited and recalculate normals outside
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.dissolve_limited()
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.normals_make_consistent(inside=False)
+    # Extrude faces upwards by 0.6mm
+    extruded_faces = bmesh.ops.extrude_face_region(bm, geom=faces)
+    bmesh.ops.transform(
+        bm,
+        matrix=Matrix.Translation((0, 0, 0.6)),
+        verts=[v for v in extruded_faces["geom"] if isinstance(v, bmesh.types.BMVert)],
+    )
 
-        bpy.ops.object.mode_set(mode="OBJECT")
+    # Limited dissolve and merge by distance
+    bmesh.ops.dissolve_limit(
+        bm,
+        angle_limit=ANGLE,
+        verts=bm.verts,
+        edges=bm.edges,
+        delimit={"NORMAL"},
+    )
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0001)
+
+    # Select and delete interior faces
+    interior_faces = _select_interior_faces(bm)
+    if interior_faces:
+        bmesh.ops.delete(bm, geom=interior_faces, context="FACES")
+
+    # Second dissolve limited and recalculate normals
+    bmesh.ops.dissolve_limit(
+        bm,
+        angle_limit=ANGLE,
+        use_dissolve_boundaries=False,
+        verts=bm.verts,
+        edges=bm.edges,
+        delimit={"NORMAL"},
+    )
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+
+    bm.to_mesh(mesh)
+    bm.free()
+
+
+def _apply_scale_to_mesh(obj):
+    """
+    Apply scale to mesh data
+
+    Args:
+        obj: The mesh object to apply scale to
+    """
+    mesh = obj.data
+
+    # Create a scale matrix from the object's current scale
+    scale_matrix = (
+        Matrix.Scale(obj.scale.x, 4, (1, 0, 0))
+        @ Matrix.Scale(obj.scale.y, 4, (0, 1, 0))
+        @ Matrix.Scale(obj.scale.z, 4, (0, 0, 1))
+    )
+
+    # Apply scale to mesh vertices
+    mesh.transform(scale_matrix)
+
+    # Reset object scale to 1
+    obj.scale = (1.0, 1.0, 1.0)
+
+
+def _set_origin_to_center_of_mass(obj):
+    """
+    Set object origin to the center of mass (median center)
+
+    This calculates the geometric center of all vertices and moves the mesh
+    so that center becomes the object's origin point.
+
+    Args:
+        obj: The mesh object to center
+    """
+    from mathutils import Vector
+
+    mesh = obj.data
+
+    # Calculate the center of all vertices (median center)
+    if len(mesh.vertices) == 0:
+        return
+
+    center = sum((v.co for v in mesh.vertices), Vector((0, 0, 0))) / len(mesh.vertices)
+
+    # Move all vertices by the negative of the center to place center at origin
+    for v in mesh.vertices:
+        v.co -= center
+
+    # Move the object location by the center offset (in world space)
+    # This keeps the mesh in the same world position but moves the origin
+    obj.location += center
+
+
+def _join_mesh_objects_bmesh(mesh_objects: list):
+    """
+    Join multiple mesh objects into one using BMesh.
+
+    Args:
+        mesh_objects: List of mesh objects to join
+
+    Returns:
+        The base mesh object with all others merged into it, or None if empty list
+    """
+    if not mesh_objects:
+        return None
+    if len(mesh_objects) == 1:
+        return mesh_objects[0]
+
+    base_obj = mesh_objects[0]
+    base_mesh = base_obj.data
+
+    # Create BMesh and load base mesh
+    bm = bmesh.new()
+    bm.from_mesh(base_mesh)
+
+    # Merge each additional object into the base
+    for obj in mesh_objects[1:]:
+        # Create temporary BMesh for this object
+        bm_temp = bmesh.new()
+        bm_temp.from_mesh(obj.data)
+
+        # Transform vertices to match base object's world space
+        transform_matrix = obj.matrix_world @ base_obj.matrix_world.inverted()
+        bm_temp.transform(transform_matrix)
+
+        # Merge the temporary BMesh into the base BMesh
+        # We need to manually copy geometry
+        vert_map = {}
+
+        for v in bm_temp.verts:
+            new_vert = bm.verts.new(v.co)
+            vert_map[v.index] = new_vert
+
+        for f in bm_temp.faces:
+            try:
+                new_verts = [vert_map[v.index] for v in f.verts]
+                bm.faces.new(new_verts)
+            except ValueError:
+                # Face already exists, skip
+                pass
+
+        bm_temp.free()
+
+        # Remove the merged object
+        bpy.data.objects.remove(obj, do_unlink=True)
+
+    # Update base mesh with merged geometry
+    bm.to_mesh(base_mesh)
+    base_mesh.update()
+    bm.free()
+
+    return base_obj
+
+
+def _batch_convert_curves_to_meshes(curve_objects: list) -> list:
+    """
+    Convert curve objects to mesh objects using low-level API (depsgraph evaluation).
+    Args:
+        curve_objects: List of curve objects to convert
+
+    Returns:
+        List of newly created mesh objects
+    """
+    context = bpy.context
+    depsgraph = context.evaluated_depsgraph_get()
+    new_mesh_objects = []
+    objects_to_remove = []
+
+    for obj in curve_objects:
+        if obj.type not in {"CURVE", "SURFACE", "FONT"}:
+            continue
+
+        # Get evaluated version with modifiers applied
+        obj_eval = obj.evaluated_get(depsgraph)
+
+        # Create mesh from evaluated object
+        mesh = bpy.data.meshes.new_from_object(obj_eval)
+
+        # Create new mesh object with same transform
+        new_obj = bpy.data.objects.new(obj.name + "_mesh", mesh)
+        new_obj.matrix_world = obj.matrix_world.copy()
+
+        # Link to scene collection
+        context.scene.collection.objects.link(new_obj)
+        new_mesh_objects.append(new_obj)
+
+        # Mark original for removal
+        objects_to_remove.append(obj)
+
+    # Remove original curve objects after creating all meshes
+    for obj in objects_to_remove:
+        if obj.name in bpy.data.objects:
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+    return new_mesh_objects
+
+
+def _select_interior_faces(bm) -> dict:
+    """
+    Select interior faces in a BMesh using a two-pass method:
+        1. Identify candidate faces where all edges have more than 2 face users.
+        2. Verify candidates with raycasts to ensure they're truly interior, if the ray
+        hits another face along the normal direction whose normal is roughly opposite.
+    Args:
+        bm: The BMesh to operate on
+    Returns:
+        A dictionary with selected interior faces
+    """
+    candidate_faces = [
+        f for f in bm.faces if f.edges and all(len(e.link_faces) > 2 for e in f.edges)
+    ]
+
+    interior_faces = []
+    bm.faces.ensure_lookup_table()
+
+    for face in candidate_faces:
+        ray_origin = face.calc_center_median()
+        ray_direction = face.normal
+
+        # Check if ray hits another face
+        hit = False
+        for other_face in bm.faces:
+            if other_face == face:
+                continue
+            # If we can reach the back of another face along the normal, this face is interior
+            result = other_face.calc_center_median() - ray_origin
+            if result.dot(ray_direction) > 0.001:  # Small epsilon for floating point
+                # Check if the other face's normal is roughly opposite
+                if other_face.normal.dot(ray_direction) < -0.5:
+                    hit = True
+                    break
+
+        if hit:
+            interior_faces.append(face)
+
+    return interior_faces
 
 
 def _check_mesh_manifold(design_obj) -> tuple[bool, int]:
     """
-    Check if a mesh is manifold (has no non-manifold geometry).
-    
+    Check if a mesh is manifold (has no non-manifold geometry) using pure BMesh.
+
+    Non-manifold conditions:
+    - Vertices with no faces
+    - Edges with no faces or more than 2 faces
+    - Edges with duplicate faces
+    - Vertices not belonging to any edges
+
     Args:
         design_obj: The mesh object to check
-        
+
     Returns:
         Tuple of (is_manifold: bool, non_manifold_count: int)
     """
-    # Ensure we're in object mode
-    if bpy.context.active_object and bpy.context.active_object.mode != 'OBJECT':
-        bpy.ops.object.mode_set(mode='OBJECT')
-    
-    # Select the object and enter edit mode
-    bpy.ops.object.select_all(action='DESELECT')
-    design_obj.select_set(True)
-    bpy.context.view_layer.objects.active = design_obj
-    bpy.ops.object.mode_set(mode='EDIT')
-    
-    # Deselect all first
-    bpy.ops.mesh.select_all(action='DESELECT')
-    
-    # Select non-manifold geometry
-    bpy.ops.mesh.select_non_manifold()
-    
-    # Switch to object mode to read the selection
-    bpy.ops.object.mode_set(mode='OBJECT')
-    
-    # Count selected vertices (non-manifold elements)
     mesh = design_obj.data
-    non_manifold_count = sum(1 for v in mesh.vertices if v.select)
-    
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+
+    non_manifold_verts = set()
+
+    # Check for edges with non-manifold conditions
+    for edge in bm.edges:
+        if len(edge.link_faces) == 0 or len(edge.link_faces) > 2:
+            non_manifold_verts.update(edge.verts)
+        # Check for duplicate faces on edge
+        elif len(edge.link_faces) == 2:
+            if edge.link_faces[0] == edge.link_faces[1]:
+                non_manifold_verts.update(edge.verts)
+
+    # Check for vertices with no edges
+    for vert in bm.verts:
+        if len(vert.link_edges) == 0:
+            non_manifold_verts.add(vert)
+        # Check for vertices with no faces (wire edges)
+        elif len(vert.link_faces) == 0:
+            non_manifold_verts.add(vert)
+
+    non_manifold_count = len(non_manifold_verts)
     is_manifold = non_manifold_count == 0
-    
+
+    bm.free()
+
     return is_manifold, non_manifold_count
 
 
@@ -143,13 +373,11 @@ def process_svg_to_mesh(filepath: str, design_num: int, report_func=None) -> boo
     start_time = time.time()
 
     try:
-        bpy.ops.object.select_all(action="DESELECT")
         objects_before = set(bpy.context.scene.objects)
 
-        if not hasattr(bpy.ops.import_curve, "svg"):
-            return False
-
-        bpy.ops.import_curve.svg(filepath=filepath)
+        bpy.ops.import_curve.svg(
+            filepath=filepath
+        )  # Direct operator use required to import SVG, no direct API
 
         objects_after = set(bpy.context.scene.objects)
         new_objects = objects_after - objects_before
@@ -166,67 +394,55 @@ def process_svg_to_mesh(filepath: str, design_num: int, report_func=None) -> boo
             else:
                 return False
 
-        bpy.ops.object.select_all(action="DESELECT")
-
         curve_objects = []
         mesh_objects = []
 
         for obj in imported_curves:
             if obj.type == "CURVE":
-                obj.select_set(True)
                 curve_objects.append(obj)
             elif obj.type == "MESH":
                 mesh_objects.append(obj)
 
-        # WHY: Batch convert all curves at once for better performance
+        # Convert curves to meshes using low-level API
         if curve_objects:
-            bpy.context.view_layer.objects.active = curve_objects[0]
-            bpy.ops.object.convert(target="MESH")
-            mesh_objects.extend(curve_objects)
+            converted_meshes = _batch_convert_curves_to_meshes(curve_objects)
+            mesh_objects.extend(converted_meshes)
 
         if not mesh_objects:
             return False
 
-        if len(mesh_objects) > 1:
-            bpy.ops.object.select_all(action="DESELECT")
-            for obj in mesh_objects:
-                obj.select_set(True)
-            bpy.context.view_layer.objects.active = mesh_objects[0]
-            bpy.ops.object.join()
-        elif len(mesh_objects) == 1:
-            bpy.context.view_layer.objects.active = mesh_objects[0]
+        # Join all mesh objects into one using BMesh
+        design_obj = _join_mesh_objects_bmesh(mesh_objects)
+        if not design_obj:
+            return False
 
-        design_obj = bpy.context.active_object
         design_obj.name = f"Design_{design_num}_SVG"
 
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-
+        # Calculate scale to fit within 40mm
         dimensions = design_obj.dimensions
         max_dim = max(dimensions.x, dimensions.y)
         if max_dim > 0:
             scale_factor = 40.0 / max_dim
             design_obj.scale = (scale_factor, scale_factor, scale_factor)
 
-        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        _apply_scale_to_mesh(design_obj)
 
-        # WHY: Batch all mesh operations to minimize expensive viewport updates
         _process_mesh_geometry(design_obj)
+
+        _set_origin_to_center_of_mass(design_obj)
 
         # Check if the mesh is manifold after processing
         is_manifold, non_manifold_count = _check_mesh_manifold(design_obj)
         if not is_manifold:
             if report_func:
                 report_func(
-                    {'ERROR'}, 
+                    {"ERROR"},
                     f"SVG processing resulted in non-manifold geometry ({non_manifold_count} problematic vertices). "
-                    "This lacks real paths to create a clean mesh, it's likely the svg is only 1D lines. "
-                    "Try fixing the SVG to use real paths, or use a different design."
+                    "Try fixing the SVG to use real paths, or use a different design.",
                 )
             # Clean up the failed object
             bpy.data.objects.remove(design_obj, do_unlink=True)
             return False
-
-        bpy.ops.object.origin_set(type="ORIGIN_CENTER_OF_MASS", center="MEDIAN")
 
         logo_placer_node_group = _find_logo_placer_node_group()
         if not logo_placer_node_group:
@@ -259,10 +475,15 @@ def process_svg_to_mesh(filepath: str, design_num: int, report_func=None) -> boo
         print(f"Error processing SVG: {str(e)}")
         return False
     finally:
-        bpy.ops.object.select_all(action="DESELECT")
+        # Restore original selection state
+        for obj in bpy.context.view_layer.objects:
+            if obj is not None:
+                obj.select_set(False)
+
         for obj in orig_selected:
-            if obj.name in bpy.context.view_layer.objects:
+            if obj and obj.name in bpy.context.view_layer.objects:
                 obj.select_set(True)
+
         if orig_active and orig_active.name in bpy.context.view_layer.objects:
             bpy.context.view_layer.objects.active = orig_active
 
