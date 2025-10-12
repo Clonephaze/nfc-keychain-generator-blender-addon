@@ -21,7 +21,7 @@ try:
     import segno
     from segno import helpers
 
-    print(f"[NFC Addon] Segno loaded: {segno.__version__}")
+    # print(f"[NFC Addon] Segno loaded: {segno.__version__}")
 except Exception as e:
     print(
         "[NFC Addon] ERROR: segno library not found. QR code generation will not work."
@@ -157,9 +157,11 @@ class QRCodeGenerator:
             if not password:
                 security = "nopass"
 
-            qr = helpers.make_wifi(
+            # Use _data helper to get content string, then create QR with custom error correction
+            wifi_data = helpers.make_wifi_data(
                 ssid=ssid, password=password, security=security, hidden=hidden
             )
+            qr = segno.make(wifi_data, error=error_correction)
             return qr
         except Exception as e:
             print(f"WiFi QR code generation failed: {e}")
@@ -193,8 +195,8 @@ class QRCodeGenerator:
             return None
 
         try:
-            # segno's make_vcard requires both 'name' and 'displayname' as first two parameters
-            qr = helpers.make_vcard(
+            # Use _data helper to get vCard string, then create QR with custom error correction
+            vcard_data = helpers.make_vcard_data(
                 name=name,
                 displayname=name,
                 phone=phone or None,
@@ -202,6 +204,7 @@ class QRCodeGenerator:
                 url=url or None,
                 org=org or None,
             )
+            qr = segno.make(vcard_data, error=error_correction)
             return qr
         except Exception as e:
             print(f"Contact QR code generation failed: {e}")
@@ -248,13 +251,15 @@ class QRCodeGenerator:
                 bcc_list = [email.strip() for email in bcc_list if email.strip()]
                 bcc_list = bcc_list if bcc_list else None
 
-            qr = helpers.make_email(
+            # Use _data helper to get mailto string, then create QR with custom error correction
+            email_data = helpers.make_make_email_data(
                 to=to,
                 cc=cc_list,
                 bcc=bcc_list,
                 subject=subject or None,
                 body=body or None,
             )
+            qr = segno.make(email_data, error=error_correction)
             return qr
         except Exception as e:
             print(f"Email QR code generation failed: {e}")

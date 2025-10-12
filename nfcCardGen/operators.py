@@ -19,7 +19,6 @@ from .utils import (
     DRIVER_MAPPINGS,
     MOD_OPT_MAPPING,
     OBJECT_NAME,
-    ensure_scene_mode,
     force_update_ui_and_geometry,
     get_modifier_value,
     setup_driver_connection,
@@ -28,11 +27,11 @@ from .utils import (
 
 
 class OBJECT_OT_scene_setup(Operator):
-    """Setup scene by clearing all objects and appending the pre-built NFC card setup"""
+    """Create a new scene and load the pre-built NFC card setup (non-destructive)"""
 
     bl_idname = "object.scene_setup"
     bl_label = "Setup Scene"
-    bl_description = "Append the NFC card geometry node setup to the current scene"
+    bl_description = "Create a new dedicated scene for the NFC card generator (preserves existing work)"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -43,9 +42,9 @@ class OBJECT_OT_scene_setup(Operator):
     def execute(self, context) -> Set[str]:
         """
         This will:
-        1. Clear all objects from the current scene
+        1. Create a new dedicated scene for the NFC card generator
         2. Set scene units to mm and set scale to 0.001
-        3. Append the object with its modifiers.
+        3. Append the card object with its modifiers
         4. Fetch current modifier values and update scene properties accordingly
         5. Add drivers between modifiers based on DRIVER_MAPPINGS
         """
@@ -85,9 +84,8 @@ class OBJECT_OT_scene_setup(Operator):
             # Setup drivers between modifiers
             self._setup_modifier_drivers(card_obj)
 
-            # Set the view to a nice initial angle
-            bpy.ops.object.nfc_set_view(view_type="FULL")
-
+            # Note: We don't force a specific view - let the user control their viewport
+            
             return {"FINISHED"}
 
         except Exception as e:
@@ -95,22 +93,29 @@ class OBJECT_OT_scene_setup(Operator):
             return {"CANCELLED"}
 
     def _setup_scene_basics(self, context) -> bool:
-        """Set up basic scene properties like units and delete existing objects"""
+        """Create a new dedicated scene for the NFC card generator with proper settings"""
         try:
-            ensure_scene_mode("OBJECT", report=self.report)
+            # Create a new scene for the NFC card generator
+            scene_name = "NFC Card Generator"
 
-            # Delete all existing objects
-            bpy.ops.object.select_all(action="SELECT")
-            bpy.ops.object.delete(use_global=False, confirm=False)
+            # Check if scene already exists
+            if scene_name in bpy.data.scenes:
+                # Switch to existing scene
+                context.window.scene = bpy.data.scenes[scene_name]
+            else:
+                # Create new scene (empty, no objects copied)
+                new_scene = bpy.data.scenes.new(name=scene_name)
+                context.window.scene = new_scene
 
-            # Set scene units
-            context.scene.unit_settings.system = "METRIC"
-            context.scene.unit_settings.length_unit = "MILLIMETERS"
-            context.scene.unit_settings.scale_length = (
-                0.001  # Makes units match real-world mm
-            )
+            # Get reference to the scene we're working with
+            scene = context.window.scene
 
-            # Set clip start to avoid clipping issues
+            # Set scene units to millimeters
+            scene.unit_settings.system = "METRIC"
+            scene.unit_settings.length_unit = "MILLIMETERS"
+            scene.unit_settings.scale_length = 0.001  # Makes units match real-world mm
+
+            # Set clip start to avoid clipping issues with small objects
             for window in bpy.context.window_manager.windows:
                 for area in window.screen.areas:
                     if area.type == "VIEW_3D":
@@ -146,9 +151,13 @@ class OBJECT_OT_scene_setup(Operator):
                 if obj and obj.name == OBJECT_NAME:
                     context.collection.objects.link(obj)
 
-                    bpy.ops.object.select_all(action="DESELECT")
+                    # Deselect all objects
+                    for scene_obj in context.view_layer.objects:
+                        if scene_obj:
+                            scene_obj.select_set(False)
+                    
+                    # Select and activate the card object
                     obj.select_set(True)
-
                     context.view_layer.objects.active = obj
                     return True
 
@@ -215,8 +224,6 @@ class OBJECT_OT_nfc_toggle_boolean_option(Operator):
 
     def execute(self, context) -> Set[str]:
         """Toggle the boolean option via the modifier socket."""
-        ensure_scene_mode("OBJECT", report=self.report)
-
         props = context.scene.nfc_card_props
 
         # Get current value and toggle it
@@ -306,7 +313,6 @@ def _set_enum_property_with_mapping(
     Returns:
         Set with operation result ('FINISHED' or 'CANCELLED')
     """
-    ensure_scene_mode("OBJECT", report=operator.report)
 
     print(f"Setting {prop_name} to: {enum_value}")
 
@@ -444,7 +450,10 @@ class OBJECT_OT_nfc_set_view(Operator):
         return OBJECT_NAME in bpy.data.objects
 
     def execute(self, context) -> Set[str]:
-        """Set the 3D viewport to the specified view."""
+        """Set the 3D viewport to the specified view using direct API."""
+        from mathutils import Quaternion, Vector
+        import math
+        
         # Find the 3D view area
         area = None
         for a in context.screen.areas:
@@ -457,54 +466,72 @@ class OBJECT_OT_nfc_set_view(Operator):
             return {"CANCELLED"}
 
         space = area.spaces.active
+        region_3d = space.region_3d
 
         # Get the card object to frame it
         card_obj = bpy.data.objects.get(OBJECT_NAME)
 
         if card_obj:
-            # Select and make active
-            bpy.ops.object.select_all(action="DESELECT")
+            # Deselect all and select card
+            for obj in context.view_layer.objects:
+                if obj:
+                    obj.select_set(False)
             card_obj.select_set(True)
             context.view_layer.objects.active = card_obj
 
-        # Set the view based on type
+        # Set view rotation based on type using quaternions
         if self.view_type == "TOP":
-            bpy.ops.view3d.view_axis(type="TOP")
+            region_3d.view_rotation = Quaternion((1.0, 0.0, 0.0, 0.0))  # Top view
+            region_3d.view_perspective = 'ORTHO'
             space.shading.show_xray = self.enable_xray
 
         elif self.view_type == "TOP_ANGLE":
-            # Set to top view first (numpad 7)
-            bpy.ops.view3d.view_axis(type="TOP")
-            # Rotate down twice (numpad 2, 2) - rotate the view to look down at an angle
-            bpy.ops.view3d.view_orbit(type="ORBITDOWN")
-            bpy.ops.view3d.view_orbit(type="ORBITDOWN")
-            # Exit orthographic view (numpad 5)
-            if not space.region_3d.is_perspective:
-                bpy.ops.view3d.view_persportho()
+            # Angled top view (45 degrees down from top)
+            rotation_x = Quaternion((1.0, 0.0, 0.0), math.radians(-45))
+            region_3d.view_rotation = rotation_x
+            region_3d.view_perspective = 'PERSP'
             space.shading.show_xray = self.enable_xray
 
         elif self.view_type == "BOTTOM":
-            bpy.ops.view3d.view_axis(type="BOTTOM")
+            region_3d.view_rotation = Quaternion((0.0, 1.0, 0.0, 0.0))  # Bottom view
+            region_3d.view_perspective = 'ORTHO'
             space.shading.show_xray = self.enable_xray
 
         elif self.view_type == "SIDE":
-            bpy.ops.view3d.view_axis(type="FRONT")
+            region_3d.view_rotation = Quaternion((0.7071, 0.7071, 0.0, 0.0))  # Front view
+            region_3d.view_perspective = 'ORTHO'
             space.shading.show_xray = self.enable_xray
 
         elif self.view_type == "SIDE_XRAY":
-            bpy.ops.view3d.view_axis(type="FRONT")
+            region_3d.view_rotation = Quaternion((0.7071, 0.7071, 0.0, 0.0))  # Front view
+            region_3d.view_perspective = 'ORTHO'
             space.shading.show_xray = True
 
         elif self.view_type == "FULL":
-            # Set to a nice angled view
-            bpy.ops.view3d.view_axis(type="TOP")
-            bpy.ops.view3d.view_orbit(type="ORBITDOWN")
-            bpy.ops.view3d.view_orbit(type="ORBITDOWN")
+            # Nice angled view (similar to TOP_ANGLE but different angle)
+            rotation_x = Quaternion((1.0, 0.0, 0.0), math.radians(-30))
+            region_3d.view_rotation = rotation_x
+            region_3d.view_perspective = 'PERSP'
             space.shading.show_xray = False
 
-        # Frame the selected object
+        # Frame the object by calculating appropriate view distance
         if card_obj:
-            bpy.ops.view3d.view_selected()
+            # Calculate bounding box
+            bbox_corners = [card_obj.matrix_world @ Vector(corner) for corner in card_obj.bound_box]
+            bbox_min = Vector((min(c.x for c in bbox_corners), 
+                              min(c.y for c in bbox_corners), 
+                              min(c.z for c in bbox_corners)))
+            bbox_max = Vector((max(c.x for c in bbox_corners), 
+                              max(c.y for c in bbox_corners), 
+                              max(c.z for c in bbox_corners)))
+            
+            # Set view location to object center
+            center = (bbox_min + bbox_max) / 2
+            region_3d.view_location = center
+            
+            # Calculate appropriate distance
+            size = (bbox_max - bbox_min).length
+            region_3d.view_distance = size * 2.5  # Zoom out a bit for better framing
 
         return {"FINISHED"}
 
@@ -528,35 +555,31 @@ class OBJECT_OT_nfc_export_stl(Operator, ExportHelper):
     def execute(self, context):
         """Execute the STL export operation."""
         try:
-            # Get the final card object
-            card_obj = None
-            for obj in bpy.context.scene.objects:
-                if (
-                    obj.name.lower() == "card"
-                    or obj.name.startswith("FinalCardTag")
-                    or obj.name == "CardTag"
-                ):
-                    card_obj = obj
-                    break
+            # Get the card object using the constant name
+            card_obj = bpy.data.objects.get(OBJECT_NAME)
 
             if not card_obj:
                 self.report(
-                    {"ERROR"}, "No card object found to export. Generate a card first."
+                    {"ERROR"}, 
+                    f"Card object '{OBJECT_NAME}' not found. Please set up the scene first."
                 )
                 return {"CANCELLED"}
 
-            # Clear selection and select only the card object
-            bpy.ops.object.select_all(action="DESELECT")
+            # Deselect all objects
+            for obj in context.view_layer.objects:
+                if obj:
+                    obj.select_set(False)
+            
+            # Select only the card object
             card_obj.select_set(True)
-            bpy.context.view_layer.objects.active = card_obj
+            context.view_layer.objects.active = card_obj
 
-            # Export to STL using the native Blender STL exporter
             bpy.ops.wm.stl_export(
                 filepath=self.filepath,
                 export_selected_objects=True,
                 global_scale=1.0,
                 apply_modifiers=True,
-            )
+            ) # Direct operator use required to export to STL, no direct API
 
             self.report(
                 {"INFO"},

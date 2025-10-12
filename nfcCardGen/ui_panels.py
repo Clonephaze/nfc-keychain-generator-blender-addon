@@ -24,6 +24,16 @@ class VIEW3D_PT_tag_card_main(Panel):
         props = context.scene.nfc_card_props
 
         if not props.scene_setup:
+            # Info box explaining what will happen
+            info_box = layout.box()
+            info_col = info_box.column(align=True)
+            info_col.label(text="Setup will:", icon='INFO')
+            info_col.label(text="• Create a new scene")
+            info_col.label(text="• Load NFC card template")
+            info_col.label(text="• Set units to millimeters")
+            layout.separator()
+            
+            # Setup button
             layout.operator("object.scene_setup", text="Prep Scene", icon="IMPORT")
 
         else:
@@ -41,6 +51,11 @@ class VIEW3D_PT_tag_card_shape(Panel):
     bl_region_type = "UI"
     bl_category = "NFC Cards"
     bl_parent_id = "VIEW3D_PT_tag_card_main"
+    
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only show this panel if the scene is set up."""
+        return context.scene.nfc_card_props.scene_setup
 
     def draw(self, context) -> None:
         """Draw the shape settings panel."""
@@ -155,6 +170,11 @@ class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
     bl_region_type = "UI"
     bl_category = "NFC Cards"
     bl_parent_id = "VIEW3D_PT_tag_card_main"
+    
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only show this panel if the scene is set up."""
+        return context.scene.nfc_card_props.scene_setup
 
     def draw(self, context) -> None:
         layout = self.layout
@@ -275,6 +295,11 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
     bl_region_type = "UI"
     bl_category = "NFC Cards"
     bl_parent_id = "VIEW3D_PT_tag_card_main"
+    
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only show this panel if the scene is set up."""
+        return context.scene.nfc_card_props.scene_setup
 
     def draw(self, context) -> None:
         """Draw the design settings panel."""
@@ -426,6 +451,11 @@ class VIEW3D_PT_tag_card_export(Panel):
     bl_region_type = "UI"
     bl_category = "NFC Cards"
     bl_parent_id = "VIEW3D_PT_tag_card_main"
+    
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only show this panel if the scene is set up."""
+        return context.scene.nfc_card_props.scene_setup
 
     def draw(self, context) -> None:
         """Draw the export panel."""

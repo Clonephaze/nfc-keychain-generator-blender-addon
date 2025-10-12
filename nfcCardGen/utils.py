@@ -213,10 +213,6 @@ def update_modifier_input(modifier_name, socket_name, value, report_func=None):
     Returns:
         bool: True if update succeeded, False if it failed
     """
-    if not ensure_scene_mode("OBJECT"):
-        if report_func:
-            report_func({"ERROR"}, "Must be in Object mode to update modifiers")
-        return False
 
     # Get the Card object
     card_obj = bpy.data.objects.get(OBJECT_NAME)
@@ -257,42 +253,4 @@ def update_modifier_input(modifier_name, socket_name, value, report_func=None):
         print(error_msg)
         if report_func:
             report_func({"ERROR"}, error_msg)
-        return False
-
-
-def ensure_scene_mode(mode, report=None):
-    """Ensure the scene is in the specified mode.
-    Args:
-        mode (str): The desired mode, e.g. 'OBJECT', 'EDIT', 'SCULPT', etc.
-        report (callable, optional): A Blender operator report function to surface warnings, e.g. self.report
-    Returns:
-        bool: True if we are in the desired mode (either already or after switching), False if switching failed.
-    Notes:
-        - Keeps side effects minimal; only attempts a mode switch.
-        - Tries to ensure an active object exists when switching to non-OBJECT modes.
-    """
-    try:
-        if bpy.context.mode == mode:
-            return True
-
-        # When switching to a non-OBJECT mode, Blender requires an active object.
-        if mode != "OBJECT" and bpy.context.active_object is None:
-            # Try to activate a visible object in the current view layer
-            for obj in bpy.context.view_layer.objects:
-                try:
-                    if obj.visible_get():
-                        bpy.context.view_layer.objects.active = obj
-                        break
-                except Exception:
-                    # visible_get can fail for some data-block states; ignore and continue
-                    continue
-
-        bpy.ops.object.mode_set(mode=mode)
-        return bpy.context.mode == mode
-    except Exception as e:
-        if report:
-            try:
-                report({"WARNING"}, f"Unable to switch to {mode} mode: {e}")
-            except Exception:
-                pass
         return False
