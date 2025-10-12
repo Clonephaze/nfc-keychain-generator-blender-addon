@@ -8,14 +8,8 @@ type = "add-on"
 blender_version_min = "4.2.0"
 license = ['SPDX:GPL-3.0-or-later']
 website = "https://github.com/Clonephaze/nfc-keychain-generator-blender-addon"
-copyright = [
-    "2025 Clonephaze",
-]
-tags = [
-	"Modeling",
-	"Object",
-]
-
+copyright = ["2025 Clonephaze"]
+tags = ["Modeling", "Object"]
 description = """
 A comprehensive add-on for generating customizable 3D-printable cards, tags, and keychains.
 
@@ -30,8 +24,6 @@ Features:
 
 Uses Geometry Nodes and modifiers for maximum flexibility and performance.
 """
-wheels = [
-    "./wheels/segno-1.6.6-py3-none-any.whl",
-]
+wheels = ["./wheels/segno-1.6.6-py3-none-any.whl"]
 [permissions]
-    files = "For custom SVG import and file saving operations"
+files = "For custom SVG import and file saving operations"
