@@ -27,12 +27,12 @@ class VIEW3D_PT_tag_card_main(Panel):
             # Info box explaining what will happen
             info_box = layout.box()
             info_col = info_box.column(align=True)
-            info_col.label(text="Setup will:", icon='INFO')
+            info_col.label(text="Setup will:", icon="INFO")
             info_col.label(text="• Create a new scene")
             info_col.label(text="• Load NFC card template")
             info_col.label(text="• Set units to millimeters")
             layout.separator()
-            
+
             # Setup button
             layout.operator("object.scene_setup", text="Prep Scene", icon="IMPORT")
 
@@ -51,7 +51,7 @@ class VIEW3D_PT_tag_card_shape(Panel):
     bl_region_type = "UI"
     bl_category = "NFC Cards"
     bl_parent_id = "VIEW3D_PT_tag_card_main"
-    
+
     @classmethod
     def poll(cls, context) -> bool:
         """Only show this panel if the scene is set up."""
@@ -170,7 +170,7 @@ class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
     bl_region_type = "UI"
     bl_category = "NFC Cards"
     bl_parent_id = "VIEW3D_PT_tag_card_main"
-    
+
     @classmethod
     def poll(cls, context) -> bool:
         """Only show this panel if the scene is set up."""
@@ -295,7 +295,7 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
     bl_region_type = "UI"
     bl_category = "NFC Cards"
     bl_parent_id = "VIEW3D_PT_tag_card_main"
-    
+
     @classmethod
     def poll(cls, context) -> bool:
         """Only show this panel if the scene is set up."""
@@ -396,7 +396,7 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
             box.prop(props, f"qr_email_subject_{design_num}", text="Subject")
             box.prop(props, f"qr_email_body_{design_num}", text="Body")
         box.prop(props, f"qr_error_correction_{design_num}", text="Error Correction")
-        
+
         # Advanced QR styling options
         self._draw_qr_advanced_options(box, props, design_num)
 
@@ -425,18 +425,18 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
         col.prop(props, f"scale_{design_num}", text="Scale")
         col.prop(props, f"offset_x_{design_num}", text="X Offset")
         col.prop(props, f"offset_y_{design_num}", text="Y Offset")
-    
+
     def _draw_qr_advanced_options(self, box, props, design_num: int) -> None:
         """Draw advanced QR code styling options in a collapsible section."""
         # Create a collapsible box for advanced options
         advanced_box = box.box()
         col = advanced_box.column(align=True)
-        col.label(text="Advanced QR Styling:", icon='SETTINGS')
-        
+        col.label(text="Advanced QR Styling:", icon="SETTINGS")
+
         # Module (data pixels) style
         col.label(text="Pattern Shape:")
         col.prop(props, f"qr_module_style_{design_num}", text="")
-        
+
         # Finder/Marker pattern center style
         col.label(text="Marker Shape:")
         col.prop(props, f"qr_finder_style_{design_num}", text="")
@@ -451,7 +451,7 @@ class VIEW3D_PT_tag_card_export(Panel):
     bl_region_type = "UI"
     bl_category = "NFC Cards"
     bl_parent_id = "VIEW3D_PT_tag_card_main"
-    
+
     @classmethod
     def poll(cls, context) -> bool:
         """Only show this panel if the scene is set up."""

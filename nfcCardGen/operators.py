@@ -85,7 +85,7 @@ class OBJECT_OT_scene_setup(Operator):
             self._setup_modifier_drivers(card_obj)
 
             # Note: We don't force a specific view - let the user control their viewport
-            
+
             return {"FINISHED"}
 
         except Exception as e:
@@ -155,7 +155,7 @@ class OBJECT_OT_scene_setup(Operator):
                     for scene_obj in context.view_layer.objects:
                         if scene_obj:
                             scene_obj.select_set(False)
-                    
+
                     # Select and activate the card object
                     obj.select_set(True)
                     context.view_layer.objects.active = obj
@@ -453,7 +453,7 @@ class OBJECT_OT_nfc_set_view(Operator):
         """Set the 3D viewport to the specified view using direct API."""
         from mathutils import Quaternion, Vector
         import math
-        
+
         # Find the 3D view area
         area = None
         for a in context.screen.areas:
@@ -482,53 +482,67 @@ class OBJECT_OT_nfc_set_view(Operator):
         # Set view rotation based on type using quaternions
         if self.view_type == "TOP":
             region_3d.view_rotation = Quaternion((1.0, 0.0, 0.0, 0.0))  # Top view
-            region_3d.view_perspective = 'ORTHO'
+            region_3d.view_perspective = "ORTHO"
             space.shading.show_xray = self.enable_xray
 
         elif self.view_type == "TOP_ANGLE":
             # Angled top view (45 degrees down from top)
             rotation_x = Quaternion((1.0, 0.0, 0.0), math.radians(-45))
             region_3d.view_rotation = rotation_x
-            region_3d.view_perspective = 'PERSP'
+            region_3d.view_perspective = "PERSP"
             space.shading.show_xray = self.enable_xray
 
         elif self.view_type == "BOTTOM":
             region_3d.view_rotation = Quaternion((0.0, 1.0, 0.0, 0.0))  # Bottom view
-            region_3d.view_perspective = 'ORTHO'
+            region_3d.view_perspective = "ORTHO"
             space.shading.show_xray = self.enable_xray
 
         elif self.view_type == "SIDE":
-            region_3d.view_rotation = Quaternion((0.7071, 0.7071, 0.0, 0.0))  # Front view
-            region_3d.view_perspective = 'ORTHO'
+            region_3d.view_rotation = Quaternion(
+                (0.7071, 0.7071, 0.0, 0.0)
+            )  # Front view
+            region_3d.view_perspective = "ORTHO"
             space.shading.show_xray = self.enable_xray
 
         elif self.view_type == "SIDE_XRAY":
-            region_3d.view_rotation = Quaternion((0.7071, 0.7071, 0.0, 0.0))  # Front view
-            region_3d.view_perspective = 'ORTHO'
+            region_3d.view_rotation = Quaternion(
+                (0.7071, 0.7071, 0.0, 0.0)
+            )  # Front view
+            region_3d.view_perspective = "ORTHO"
             space.shading.show_xray = True
 
         elif self.view_type == "FULL":
             # Nice angled view (similar to TOP_ANGLE but different angle)
             rotation_x = Quaternion((1.0, 0.0, 0.0), math.radians(-30))
             region_3d.view_rotation = rotation_x
-            region_3d.view_perspective = 'PERSP'
+            region_3d.view_perspective = "PERSP"
             space.shading.show_xray = False
 
         # Frame the object by calculating appropriate view distance
         if card_obj:
             # Calculate bounding box
-            bbox_corners = [card_obj.matrix_world @ Vector(corner) for corner in card_obj.bound_box]
-            bbox_min = Vector((min(c.x for c in bbox_corners), 
-                              min(c.y for c in bbox_corners), 
-                              min(c.z for c in bbox_corners)))
-            bbox_max = Vector((max(c.x for c in bbox_corners), 
-                              max(c.y for c in bbox_corners), 
-                              max(c.z for c in bbox_corners)))
-            
+            bbox_corners = [
+                card_obj.matrix_world @ Vector(corner) for corner in card_obj.bound_box
+            ]
+            bbox_min = Vector(
+                (
+                    min(c.x for c in bbox_corners),
+                    min(c.y for c in bbox_corners),
+                    min(c.z for c in bbox_corners),
+                )
+            )
+            bbox_max = Vector(
+                (
+                    max(c.x for c in bbox_corners),
+                    max(c.y for c in bbox_corners),
+                    max(c.z for c in bbox_corners),
+                )
+            )
+
             # Set view location to object center
             center = (bbox_min + bbox_max) / 2
             region_3d.view_location = center
-            
+
             # Calculate appropriate distance
             size = (bbox_max - bbox_min).length
             region_3d.view_distance = size * 2.5  # Zoom out a bit for better framing
@@ -560,8 +574,8 @@ class OBJECT_OT_nfc_export_stl(Operator, ExportHelper):
 
             if not card_obj:
                 self.report(
-                    {"ERROR"}, 
-                    f"Card object '{OBJECT_NAME}' not found. Please set up the scene first."
+                    {"ERROR"},
+                    f"Card object '{OBJECT_NAME}' not found. Please set up the scene first.",
                 )
                 return {"CANCELLED"}
 
@@ -569,7 +583,7 @@ class OBJECT_OT_nfc_export_stl(Operator, ExportHelper):
             for obj in context.view_layer.objects:
                 if obj:
                     obj.select_set(False)
-            
+
             # Select only the card object
             card_obj.select_set(True)
             context.view_layer.objects.active = card_obj
@@ -579,7 +593,7 @@ class OBJECT_OT_nfc_export_stl(Operator, ExportHelper):
                 export_selected_objects=True,
                 global_scale=1.0,
                 apply_modifiers=True,
-            ) # Direct operator use required to export to STL, no direct API
+            )  # Direct operator use required to export to STL, no direct API
 
             self.report(
                 {"INFO"},
