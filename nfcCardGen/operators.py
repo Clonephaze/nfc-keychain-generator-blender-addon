@@ -6,6 +6,7 @@ from the UI panel. These operators will append the pre-built geometry node setup
 and provide automation for SVG processing.
 """
 
+import math
 import os
 from typing import Set
 
@@ -13,6 +14,7 @@ import bpy
 from bpy.props import StringProperty
 from bpy.types import Operator
 from bpy_extras.io_utils import ExportHelper
+from mathutils import Quaternion, Vector
 
 # Import shared utilities and constants
 from .utils import (
@@ -43,7 +45,7 @@ class OBJECT_OT_scene_setup(Operator):
         """
         This will:
         1. Create a new dedicated scene for the NFC card generator
-        2. Set scene units to mm and set scale to 0.001
+        2. Set up scene properties (units to mm, scale to 0.001, clip start, shadows)
         3. Append the card object with its modifiers
         4. Fetch current modifier values and update scene properties accordingly
         5. Add drivers between modifiers based on DRIVER_MAPPINGS
@@ -77,6 +79,9 @@ class OBJECT_OT_scene_setup(Operator):
                     {"ERROR"}, f"{OBJECT_NAME} object not found after appending"
                 )
                 return {"CANCELLED"}
+            
+            # Set the viewport to top angle view
+            bpy.ops.object.nfc_set_view(view_type="TOP_ANGLE")
 
             # Sync modifier values to UI properties
             self._sync_modifier_values_to_props(context, card_obj)
@@ -109,6 +114,21 @@ class OBJECT_OT_scene_setup(Operator):
 
             # Get reference to the scene we're working with
             scene = context.window.scene
+            # Find the 3D view area
+            area = None
+            for a in context.screen.areas:
+                if a.type == "VIEW_3D":
+                    area = a
+                    break
+
+            if not area:
+                self.report({"WARNING"}, "No 3D View found")
+                return {"CANCELLED"}
+
+            space = area.spaces.active
+            space.shading.shadow_intensity = 0.35
+            space.shading.show_shadows = True
+
 
             # Set scene units to millimeters
             scene.unit_settings.system = "METRIC"
@@ -451,8 +471,14 @@ class OBJECT_OT_nfc_set_view(Operator):
 
     def execute(self, context) -> Set[str]:
         """Set the 3D viewport to the specified view using direct API."""
-        from mathutils import Quaternion, Vector
-        import math
+        
+        ROTATIONS = {
+            "TOP": Quaternion((1, 0, 0), 0),
+            "TOP_ANGLE": Quaternion((1, 0, 0), math.radians(20)),
+            "BOTTOM": Quaternion((1, 0, 0), math.radians(180)),
+            "FRONT": Quaternion((0, 0, 1), 0) @ Quaternion((1, 0, 0), math.radians(90)),
+        }
+
 
         # Find the 3D view area
         area = None
@@ -480,43 +506,32 @@ class OBJECT_OT_nfc_set_view(Operator):
             context.view_layer.objects.active = card_obj
 
         # Set view rotation based on type using quaternions
-        if self.view_type == "TOP":
-            region_3d.view_rotation = Quaternion((1.0, 0.0, 0.0, 0.0))  # Top view
-            region_3d.view_perspective = "ORTHO"
-            space.shading.show_xray = self.enable_xray
+        match self.view_type:
+            case "TOP":
+                region_3d.view_rotation = ROTATIONS["TOP"]
+                region_3d.view_perspective = "ORTHO"
+                space.shading.show_xray = self.enable_xray
 
-        elif self.view_type == "TOP_ANGLE":
-            # Angled top view (45 degrees down from top)
-            rotation_x = Quaternion((1.0, 0.0, 0.0), math.radians(-45))
-            region_3d.view_rotation = rotation_x
-            region_3d.view_perspective = "PERSP"
-            space.shading.show_xray = self.enable_xray
+            case "TOP_ANGLE":
+                # Angled top view (45 degrees down from top)
+                region_3d.view_rotation = ROTATIONS["TOP_ANGLE"]
+                region_3d.view_perspective = "PERSP"
+                space.shading.show_xray = self.enable_xray
 
-        elif self.view_type == "BOTTOM":
-            region_3d.view_rotation = Quaternion((0.0, 1.0, 0.0, 0.0))  # Bottom view
-            region_3d.view_perspective = "ORTHO"
-            space.shading.show_xray = self.enable_xray
+            case "BOTTOM":
+                region_3d.view_rotation = ROTATIONS["BOTTOM"]
+                region_3d.view_perspective = "ORTHO"
+                space.shading.show_xray = self.enable_xray
 
-        elif self.view_type == "SIDE":
-            region_3d.view_rotation = Quaternion(
-                (0.7071, 0.7071, 0.0, 0.0)
-            )  # Front view
-            region_3d.view_perspective = "ORTHO"
-            space.shading.show_xray = self.enable_xray
+            case "SIDE":
+                region_3d.view_rotation = ROTATIONS["FRONT"]
+                region_3d.view_perspective = "ORTHO"
+                space.shading.show_xray = self.enable_xray
 
-        elif self.view_type == "SIDE_XRAY":
-            region_3d.view_rotation = Quaternion(
-                (0.7071, 0.7071, 0.0, 0.0)
-            )  # Front view
-            region_3d.view_perspective = "ORTHO"
-            space.shading.show_xray = True
-
-        elif self.view_type == "FULL":
-            # Nice angled view (similar to TOP_ANGLE but different angle)
-            rotation_x = Quaternion((1.0, 0.0, 0.0), math.radians(-30))
-            region_3d.view_rotation = rotation_x
-            region_3d.view_perspective = "PERSP"
-            space.shading.show_xray = False
+            case "SIDE_XRAY":
+                region_3d.view_rotation = ROTATIONS["FRONT"]
+                region_3d.view_perspective = "ORTHO"
+                space.shading.show_xray = True
 
         # Frame the object by calculating appropriate view distance
         if card_obj:
@@ -545,7 +560,7 @@ class OBJECT_OT_nfc_set_view(Operator):
 
             # Calculate appropriate distance
             size = (bbox_max - bbox_min).length
-            region_3d.view_distance = size * 2.5  # Zoom out a bit for better framing
+            region_3d.view_distance = size * 1.75  # Zoom out a bit for better framing
 
         return {"FINISHED"}
 
