@@ -26,20 +26,20 @@ class VIEW3D_PT_tag_card_main(Panel):
         if not props.scene_setup:
             # Info box explaining what will happen
             info_box = layout.box()
+            info_box.scale_y = 0.8
             info_col = info_box.column(align=True)
             info_col.label(text="Setup will:", icon="INFO")
             info_col.label(text="• Create a new scene")
             info_col.label(text="• Load NFC card template")
             info_col.label(text="• Set units to millimeters")
-            layout.separator()
 
             # Setup button
             layout.operator("object.scene_setup", text="Prep Scene", icon="IMPORT")
 
         else:
-            layout.label(text="NFC Card Generator", icon="MESH_CUBE")
-
-        layout.separator()
+            title_row = layout.row()
+            title_row.label(text="NFC Card Generator", icon="MESH_CUBE")
+            title_row.scale_y = 0.8
 
 
 class VIEW3D_PT_tag_card_shape(Panel):
@@ -65,23 +65,17 @@ class VIEW3D_PT_tag_card_shape(Panel):
         if not props.scene_setup:
             return
 
-        # View control button
-        view_box = layout.box()
-        view_box.label(text="View:", icon="VIEW3D")
-        view_op = view_box.operator(
-            "object.nfc_set_view", text="Top/Side View", icon="AXIS_TOP"
-        )
-        view_op.view_type = "TOP_ANGLE"
+        _camera_view_box(layout, "CARD_SHAPE")
 
-        layout.separator()
+        layout.separator(factor=0.2)
 
         self._shape_choice_section(layout, props)
 
-        layout.separator()
+        layout.separator(factor=0.2)
 
         self._height_settings_section(layout, props)
 
-        layout.separator()
+        layout.separator(factor=0.2)
 
         self._bevel_settings_section(layout, props)
 
@@ -90,6 +84,7 @@ class VIEW3D_PT_tag_card_shape(Panel):
         layout.label(text="Shape Preset:")
 
         row = layout.row(align=True)
+        row.scale_y = 1.2
 
         # Rectangle button
         rect_op = row.operator(
@@ -141,6 +136,7 @@ class VIEW3D_PT_tag_card_shape(Panel):
         )
 
         row = layout.row()
+        row.scale_y = 0.6
         col_labels = row.column()
         col_values = row.column()
 
@@ -164,7 +160,7 @@ class VIEW3D_PT_tag_card_shape(Panel):
 class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
     """Panel for magnet hole and NFC cavity settings"""
 
-    bl_label = "Magnet Settings"
+    bl_label = "Magnet and Cavity Settings"
     bl_idname = "VIEW3D_PT_tag_card_magnet"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -183,25 +179,12 @@ class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
         if not props.scene_setup:
             return
 
-        # View control buttons
-        view_box = layout.box()
-        view_box.label(text="View:", icon="VIEW3D")
-        row = view_box.row(align=True)
+        _camera_view_box(layout, "MAGNET_CAVITY")
 
-        # Side X-Ray view for cutout
-        side_op = row.operator("object.nfc_set_view", text="Side (X-Ray)", icon="XRAY")
-        side_op.view_type = "SIDE_XRAY"
-
-        # Bottom view for magnets
-        if props.magnet_choice:
-            bottom_op = row.operator(
-                "object.nfc_set_view", text="Bottom", icon="AXIS_TOP"
-            )
-            bottom_op.view_type = "BOTTOM"
-
-        layout.separator()
+        layout.separator(factor=0.2)
 
         _draw_nfc_cavity_section = self._draw_nfc_cavity_section(layout, props)
+
         _draw_magnet_section = self._draw_magnet_section(layout, props)
 
     def _draw_magnet_section(self, layout, props) -> None:
@@ -241,36 +224,37 @@ class VIEW3D_PT_tag_card_magnet_and_cavity(Panel):
 
     def _draw_nfc_cavity_section(self, layout, props) -> None:
         """Draw the NFC cavity settings section."""
-        layout.label(text="NFC Cavity Settings:")
-
         # Cavity shape buttons
-        layout.label(text="Cavity Shape:")
+        layout.label(text="Cavity Shape and height:")
         row = layout.row(align=True)
 
-        # Rectangle button
-        rect_op = row.operator(
-            "object.nfc_set_cavity_shape",
-            text="Rectangle",
-            depress=(props.nfc_cavity_choice == "RECTANGLE"),
-        )
-        rect_op.shape_type = "RECTANGLE"
-
-        # Circle button
-        circle_op = row.operator(
-            "object.nfc_set_cavity_shape",
-            text="Circle",
-            depress=(props.nfc_cavity_choice == "CIRCLE"),
-        )
-        circle_op.shape_type = "CIRCLE"
-
-        # Double Circle button (only for rectangle shapes)
+        # NFC Shape choice is only for rectangle shapes, geo nodes will handle shape restriction
         if props.shape_preset == "RECTANGLE":
+            
+            row.scale_y = 1.2
+            rect_op = row.operator(
+                "object.nfc_set_cavity_shape",
+                text="Rectangle",
+                depress=(props.nfc_cavity_choice == "RECTANGLE"),
+            )
+            rect_op.shape_type = "RECTANGLE"
+
+            circle_op = row.operator(
+                "object.nfc_set_cavity_shape",
+                text="Circle",
+                depress=(props.nfc_cavity_choice == "CIRCLE"),
+            )
+            circle_op.shape_type = "CIRCLE"
+
             double_op = row.operator(
                 "object.nfc_set_cavity_shape",
                 text="Double Circle",
                 depress=(props.nfc_cavity_choice == "DOUBLE_CIRCLE"),
             )
             double_op.shape_type = "DOUBLE_CIRCLE"
+        else:
+            row.scale_y = 0.8
+            row.label(text="Circular tags only support one shape.")
 
         layout.prop(props, "nfc_cavity_height", text="Cavity Height")
 
@@ -309,20 +293,9 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
         if not props.scene_setup:
             return
 
-        # View control buttons
-        view_box = layout.box()
-        view_box.label(text="View:", icon="VIEW3D")
-        row = view_box.row(align=True)
+        _camera_view_box(layout, "DESIGN_IMPORT")
 
-        # Top view to see design
-        top_op = row.operator("object.nfc_set_view", text="Top", icon="AXIS_TOP")
-        top_op.view_type = "TOP"
-
-        # Side view to see inset/outset
-        side_op = row.operator("object.nfc_set_view", text="Side", icon="AXIS_SIDE")
-        side_op.view_type = "SIDE"
-
-        layout.separator()
+        layout.separator(factor=0.2)
 
         self._draw_inset_choice(layout, props)
         self._draw_design_section(layout, props, design_num=1)
@@ -352,20 +325,20 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
 
     def _draw_mode_buttons(self, box, props, design_num: int) -> None:
         row = box.row(align=True)
-        qr_op = row.operator(
-            "object.nfc_toggle_qr_mode",
-            text="Generate QR",
-            depress=self._is_qr_mode(props, design_num),
-        )
-        qr_op.design_num = design_num
-        qr_op.enable_qr = True
         svg_op = row.operator(
             "object.nfc_toggle_qr_mode",
             text="Custom SVG",
             depress=not self._is_qr_mode(props, design_num),
         )
         svg_op.design_num = design_num
+        qr_op = row.operator(
+            "object.nfc_toggle_qr_mode",
+            text="Generate QR",
+            depress=self._is_qr_mode(props, design_num),
+        )
+        qr_op.design_num = design_num
         svg_op.enable_qr = False
+        qr_op.enable_qr = True
 
     def _is_qr_mode(self, props, design_num: int) -> bool:
         return props.qr_mode_1 if design_num == 1 else props.qr_mode_2
@@ -466,7 +439,7 @@ class VIEW3D_PT_tag_card_export(Panel):
             return
 
         self._draw_card_info(layout, props)
-        layout.separator()
+        layout.separator(factor=0.2)
         self._draw_export_section(layout, props)
 
     def _draw_card_info(self, layout, props) -> None:
@@ -515,6 +488,38 @@ class VIEW3D_PT_tag_card_export(Panel):
         )
         col.label(text="• 0.2mm layer height recommended")
         col.label(text="• PLA/PETG materials work well")
+        
+#Helper functions
+def _camera_view_box(layout, panel_area) -> None:
+    '''
+    Draw a box with view control buttons for different panel areas.
+    
+    Args:
+        layout: pass in bpy.context.layout from the panel draw function
+        panel_area: string indicating which panel is calling this function
+    '''
+    view_box = layout.box()
+    vb_label = view_box.row()
+    vb_label.label(text="View:", icon="VIEW3D")
+    vb_label.scale_y = 0.8
+    row = view_box.row(align=True)
+    
+    if panel_area == "CARD_SHAPE":
+        top_op = row.operator("object.nfc_set_view", text="Default View", icon="AXIS_TOP")
+        top_op.view_type = "TOP_ANGLE"
+    elif panel_area == "MAGNET_CAVITY":
+        side_op = row.operator("object.nfc_set_view", text="Side (X-Ray)", icon="XRAY")
+        side_op.view_type = "SIDE_XRAY"
+        bottom_op = row.operator("object.nfc_set_view", text="Bottom", icon="AXIS_TOP")
+        bottom_op.view_type = "BOTTOM"
+    elif panel_area == "DESIGN_IMPORT":
+        top_op = row.operator("object.nfc_set_view", text="Top", icon="AXIS_TOP")
+        top_op.view_type = "TOP"
+        side_op = row.operator("object.nfc_set_view", text="Side", icon="AXIS_SIDE")
+        side_op.view_type = "SIDE"
+    else:
+        print(f"Error: Unknown panel area '{panel_area}' for camera view box.")
+        pass
 
 
 def register() -> None:
