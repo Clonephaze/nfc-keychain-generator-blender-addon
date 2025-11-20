@@ -35,6 +35,28 @@ MOD_OPT_MAPPING = {
     "OFFSET_X_2": ("Logo Placer", "Design 2 X Offset"),
     "OFFSET_Y_2": ("Logo Placer", "Design 2 Y Offset"),
     "SCALE_2": ("Logo Placer", "Design 2 Scale"),
+    # Design 1 Text properties
+    "DESIGN_1_TEXT": ("Logo Placer", "Design 1 Text"),
+    "TEXT_1": ("Logo Placer", "Text"),
+    "TEXT_SIZE_1": ("Logo Placer", "Text Size"),
+    "CHARACTER_SPACING_1": ("Logo Placer", "Character Spacing"),
+    "WORD_SPACING_1": ("Logo Placer", "Word Spacing"),
+    "LINE_SPACING_1": ("Logo Placer", "Line Spacing"),
+    "TEXT_BOX_WIDTH_1": ("Logo Placer", "Text Box Width"),
+    "TEXT_BOX_HEIGHT_1": ("Logo Placer", "Text Box Height"),
+    "TEXT_X_OFFSET_1": ("Logo Placer", "Text X Offset"),
+    "TEXT_Y_OFFSET_1": ("Logo Placer", "Text Y Offset"),
+    # Design 2 Text properties (Note: Socket names are the same as Design 1 in the node tree)
+    "DESIGN_2_TEXT": ("Logo Placer", "Design 2 Text"),
+    "TEXT_2": ("Logo Placer", "Text.001"),  # Blender auto-appends .001 for duplicate socket names
+    "TEXT_SIZE_2": ("Logo Placer", "Text Size.001"),
+    "CHARACTER_SPACING_2": ("Logo Placer", "Character Spacing.001"),
+    "WORD_SPACING_2": ("Logo Placer", "Word Spacing.001"),
+    "LINE_SPACING_2": ("Logo Placer", "Line Spacing.001"),
+    "TEXT_BOX_WIDTH_2": ("Logo Placer", "Text Box Width.001"),
+    "TEXT_BOX_HEIGHT_2": ("Logo Placer", "Text Box Height.001"),
+    "TEXT_X_OFFSET_2": ("Logo Placer", "Text X Offset.001"),
+    "TEXT_Y_OFFSET_2": ("Logo Placer", "Text Y Offset.001"),
 }
 
 # Additional mapping for driver connections

@@ -148,6 +148,136 @@ def update_nfc_cavity_height(self, context):
     )
 
 
+# Text property update callbacks - Design 1
+def update_design_1_text(self, context):
+    """Update callback for design_1_text property."""
+    update_property(self, context, "design_1_text", "DESIGN_1_TEXT", self.design_1_text)
+
+
+def update_text_1(self, context):
+    """Update callback for text_1 property."""
+    update_property(self, context, "text_1", "TEXT_1", self.text_1)
+
+
+def update_text_size_1(self, context):
+    """Update callback for text_size_1 property."""
+    update_property(self, context, "text_size_1", "TEXT_SIZE_1", self.text_size_1)
+
+
+def update_character_spacing_1(self, context):
+    """Update callback for character_spacing_1 property."""
+    update_property(
+        self, context, "character_spacing_1", "CHARACTER_SPACING_1", self.character_spacing_1
+    )
+
+
+def update_word_spacing_1(self, context):
+    """Update callback for word_spacing_1 property."""
+    update_property(
+        self, context, "word_spacing_1", "WORD_SPACING_1", self.word_spacing_1
+    )
+
+
+def update_line_spacing_1(self, context):
+    """Update callback for line_spacing_1 property."""
+    update_property(
+        self, context, "line_spacing_1", "LINE_SPACING_1", self.line_spacing_1
+    )
+
+
+def update_text_box_width_1(self, context):
+    """Update callback for text_box_width_1 property."""
+    update_property(
+        self, context, "text_box_width_1", "TEXT_BOX_WIDTH_1", self.text_box_width_1
+    )
+
+
+def update_text_box_height_1(self, context):
+    """Update callback for text_box_height_1 property."""
+    update_property(
+        self, context, "text_box_height_1", "TEXT_BOX_HEIGHT_1", self.text_box_height_1
+    )
+
+
+def update_text_x_offset_1(self, context):
+    """Update callback for text_x_offset_1 property."""
+    update_property(
+        self, context, "text_x_offset_1", "TEXT_X_OFFSET_1", self.text_x_offset_1
+    )
+
+
+def update_text_y_offset_1(self, context):
+    """Update callback for text_y_offset_1 property."""
+    update_property(
+        self, context, "text_y_offset_1", "TEXT_Y_OFFSET_1", self.text_y_offset_1
+    )
+
+
+# Text property update callbacks - Design 2
+def update_design_2_text(self, context):
+    """Update callback for design_2_text property."""
+    update_property(self, context, "design_2_text", "DESIGN_2_TEXT", self.design_2_text)
+
+
+def update_text_2(self, context):
+    """Update callback for text_2 property."""
+    update_property(self, context, "text_2", "TEXT_2", self.text_2)
+
+
+def update_text_size_2(self, context):
+    """Update callback for text_size_2 property."""
+    update_property(self, context, "text_size_2", "TEXT_SIZE_2", self.text_size_2)
+
+
+def update_character_spacing_2(self, context):
+    """Update callback for character_spacing_2 property."""
+    update_property(
+        self, context, "character_spacing_2", "CHARACTER_SPACING_2", self.character_spacing_2
+    )
+
+
+def update_word_spacing_2(self, context):
+    """Update callback for word_spacing_2 property."""
+    update_property(
+        self, context, "word_spacing_2", "WORD_SPACING_2", self.word_spacing_2
+    )
+
+
+def update_line_spacing_2(self, context):
+    """Update callback for line_spacing_2 property."""
+    update_property(
+        self, context, "line_spacing_2", "LINE_SPACING_2", self.line_spacing_2
+    )
+
+
+def update_text_box_width_2(self, context):
+    """Update callback for text_box_width_2 property."""
+    update_property(
+        self, context, "text_box_width_2", "TEXT_BOX_WIDTH_2", self.text_box_width_2
+    )
+
+
+def update_text_box_height_2(self, context):
+    """Update callback for text_box_height_2 property."""
+    update_property(
+        self, context, "text_box_height_2", "TEXT_BOX_HEIGHT_2", self.text_box_height_2
+    )
+
+
+def update_text_x_offset_2(self, context):
+    """Update callback for text_x_offset_2 property."""
+    update_property(
+        self, context, "text_x_offset_2", "TEXT_X_OFFSET_2", self.text_x_offset_2
+    )
+
+
+def update_text_y_offset_2(self, context):
+    """Update callback for text_y_offset_2 property."""
+    update_property(
+        self, context, "text_y_offset_2", "TEXT_Y_OFFSET_2", self.text_y_offset_2
+    )
+
+
 class NFCCardProperties(PropertyGroup):
     """
     Property group for NFC card/keychain generation parameters.
@@ -704,6 +834,224 @@ class NFCCardProperties(PropertyGroup):
         precision=2,
         step=1,
         update=update_scale_2,
+    )
+
+    # Text properties - Design 1
+    design_1_text: BoolProperty(
+        name="Add Text to Design 1",
+        description="Enable text overlay on Design 1",
+        default=False,
+        update=update_design_1_text,
+    )
+
+    text_1: bpy.props.StringProperty(
+        name="Text",
+        description="Text content for Design 1",
+        default="Clone Core",
+        update=update_text_1,
+    )
+
+    text_size_1: bpy.props.FloatProperty(
+        name="Text Size",
+        description="Font size for Design 1 text",
+        default=16.22,
+        min=0.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_size_1,
+    )
+
+    character_spacing_1: bpy.props.FloatProperty(
+        name="Character Spacing",
+        description="Spacing between characters for Design 1 text",
+        default=1.0,
+        min=0.0,
+        precision=3,
+        step=0.1,
+        update=update_character_spacing_1,
+    )
+
+    word_spacing_1: bpy.props.FloatProperty(
+        name="Word Spacing",
+        description="Spacing between words for Design 1 text",
+        default=1.0,
+        min=0.0,
+        precision=3,
+        step=0.1,
+        update=update_word_spacing_1,
+    )
+
+    line_spacing_1: bpy.props.FloatProperty(
+        name="Line Spacing",
+        description="Spacing between lines for Design 1 text",
+        default=1.0,
+        min=0.0,
+        precision=3,
+        step=0.1,
+        update=update_line_spacing_1,
+    )
+
+    text_box_width_1: bpy.props.FloatProperty(
+        name="Text Box Width",
+        description="Width of the text box for Design 1",
+        default=66.0,
+        min=0.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_box_width_1,
+    )
+
+    text_box_height_1: bpy.props.FloatProperty(
+        name="Text Box Height",
+        description="Height of the text box for Design 1",
+        default=0.0,
+        min=0.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_box_height_1,
+    )
+
+    text_x_offset_1: bpy.props.FloatProperty(
+        name="Text X Offset",
+        description="X-axis offset for Design 1 text",
+        default=-20.28,
+        min=-10000.0,
+        max=10000.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_x_offset_1,
+    )
+
+    text_y_offset_1: bpy.props.FloatProperty(
+        name="Text Y Offset",
+        description="Y-axis offset for Design 1 text",
+        default=-27.40,
+        min=-10000.0,
+        max=10000.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_y_offset_1,
+    )
+
+    font_path_1: bpy.props.StringProperty(
+        name="Custom Font",
+        description="Path to custom font file for Design 1 text",
+        default="",
+        subtype='FILE_PATH',
+    )
+
+    # Text properties - Design 2
+    design_2_text: BoolProperty(
+        name="Add Text to Design 2",
+        description="Enable text overlay on Design 2",
+        default=False,
+        update=update_design_2_text,
+    )
+
+    text_2: bpy.props.StringProperty(
+        name="Text",
+        description="Text content for Design 2",
+        default="",
+        update=update_text_2,
+    )
+
+    text_size_2: bpy.props.FloatProperty(
+        name="Text Size",
+        description="Font size for Design 2 text",
+        default=16.22,
+        min=0.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_size_2,
+    )
+
+    character_spacing_2: bpy.props.FloatProperty(
+        name="Character Spacing",
+        description="Spacing between characters for Design 2 text",
+        default=1.0,
+        min=0.0,
+        precision=3,
+        step=0.1,
+        update=update_character_spacing_2,
+    )
+
+    word_spacing_2: bpy.props.FloatProperty(
+        name="Word Spacing",
+        description="Spacing between words for Design 2 text",
+        default=1.0,
+        min=0.0,
+        precision=3,
+        step=0.1,
+        update=update_word_spacing_2,
+    )
+
+    line_spacing_2: bpy.props.FloatProperty(
+        name="Line Spacing",
+        description="Spacing between lines for Design 2 text",
+        default=1.0,
+        min=0.0,
+        precision=3,
+        step=0.1,
+        update=update_line_spacing_2,
+    )
+
+    text_box_width_2: bpy.props.FloatProperty(
+        name="Text Box Width",
+        description="Width of the text box for Design 2",
+        default=40.0,
+        min=0.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_box_width_2,
+    )
+
+    text_box_height_2: bpy.props.FloatProperty(
+        name="Text Box Height",
+        description="Height of the text box for Design 2",
+        default=15.3,
+        min=0.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_box_height_2,
+    )
+
+    text_x_offset_2: bpy.props.FloatProperty(
+        name="Text X Offset",
+        description="X-axis offset for Design 2 text",
+        default=0.0,
+        min=-10000.0,
+        max=10000.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_x_offset_2,
+    )
+
+    text_y_offset_2: bpy.props.FloatProperty(
+        name="Text Y Offset",
+        description="Y-axis offset for Design 2 text",
+        default=0.0,
+        min=-10000.0,
+        max=10000.0,
+        precision=2,
+        step=1,
+        unit="LENGTH",
+        update=update_text_y_offset_2,
+    )
+
+    font_path_2: bpy.props.StringProperty(
+        name="Custom Font",
+        description="Path to custom font file for Design 2 text",
+        default="",
+        subtype='FILE_PATH',
     )
 
     # QR Code Advanced Styling Options - Design 1

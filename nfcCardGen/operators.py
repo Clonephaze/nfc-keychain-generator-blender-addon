@@ -13,7 +13,7 @@ from typing import Set
 import bpy
 from bpy.props import StringProperty
 from bpy.types import Operator
-from bpy_extras.io_utils import ExportHelper
+from bpy_extras.io_utils import ExportHelper, ImportHelper
 from mathutils import Quaternion, Vector
 
 # Import shared utilities and constants
@@ -621,6 +621,172 @@ class OBJECT_OT_nfc_export_stl(Operator, ExportHelper):
             return {"CANCELLED"}
 
 
+class OBJECT_OT_nfc_load_font_design1(Operator, ImportHelper):
+    """Load a custom font for Design 1 text"""
+
+    bl_idname = "object.nfc_load_font_design1"
+    bl_label = "Load Font"
+    bl_description = "Load a custom TrueType or OpenType font for Design 1 text"
+    bl_options = {"REGISTER", "UNDO"}
+
+    filter_glob: StringProperty(
+        default="*.ttf;*.otf;*.TTF;*.OTF",
+        options={"HIDDEN"},
+        maxlen=255,
+    )
+
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only allow if scene is set up and Card object exists."""
+        if not context.scene.nfc_card_props.scene_setup:
+            return False
+        return OBJECT_NAME in bpy.data.objects
+
+    def execute(self, context) -> Set[str]:
+        """Load the font and apply it to the Design 1 text node."""
+        try:
+            # Store the font path in properties
+            context.scene.nfc_card_props.font_path_1 = self.filepath
+
+            # Get the card object
+            card_obj = bpy.data.objects.get(OBJECT_NAME)
+            if not card_obj:
+                self.report({"ERROR"}, f"Card object '{OBJECT_NAME}' not found")
+                return {"CANCELLED"}
+
+            # Find the Logo Placer modifier
+            logo_placer_mod = card_obj.modifiers.get("Logo Placer")
+            if not logo_placer_mod or not hasattr(logo_placer_mod, "node_group"):
+                self.report({"ERROR"}, "Logo Placer modifier not found")
+                return {"CANCELLED"}
+
+            # Navigate to the Design Placement.001 node group within Logo Placer
+            logo_placer_tree = logo_placer_mod.node_group
+            design_placement_node = None
+            for node in logo_placer_tree.nodes:
+                if node.type == 'GROUP' and node.name == "Design 1 Input Values":
+                    design_placement_node = node
+                    break
+
+            if not design_placement_node or not design_placement_node.node_tree:
+                self.report({"ERROR"}, "Design 1 Input Values node group not found")
+                return {"CANCELLED"}
+
+            # Find the String to Curves node
+            design_placement_tree = design_placement_node.node_tree
+            string_to_curves = None
+            for node in design_placement_tree.nodes:
+                if node.type == 'STRING_TO_CURVES':
+                    string_to_curves = node
+                    break
+
+            if not string_to_curves:
+                self.report({"ERROR"}, "String to Curves node not found in Design 1")
+                return {"CANCELLED"}
+
+            # Load the font as a VectorFont data block
+            if self.filepath not in bpy.data.fonts:
+                font = bpy.data.fonts.load(self.filepath)
+            else:
+                font = bpy.data.fonts[self.filepath]
+
+            # Apply the font to the String to Curves node (it's a node property, not a socket)
+            string_to_curves.font = font
+
+            self.report(
+                {"INFO"},
+                f"Font loaded for Design 1: {os.path.basename(self.filepath)}",
+            )
+            return {"FINISHED"}
+
+        except Exception as e:
+            self.report({"ERROR"}, f"Failed to load font: {str(e)}")
+            return {"CANCELLED"}
+
+
+class OBJECT_OT_nfc_load_font_design2(Operator, ImportHelper):
+    """Load a custom font for Design 2 text"""
+
+    bl_idname = "object.nfc_load_font_design2"
+    bl_label = "Load Font"
+    bl_description = "Load a custom TrueType or OpenType font for Design 2 text"
+    bl_options = {"REGISTER", "UNDO"}
+
+    filter_glob: StringProperty(
+        default="*.ttf;*.otf;*.TTF;*.OTF",
+        options={"HIDDEN"},
+        maxlen=255,
+    )
+
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only allow if scene is set up and Card object exists."""
+        if not context.scene.nfc_card_props.scene_setup:
+            return False
+        return OBJECT_NAME in bpy.data.objects
+
+    def execute(self, context) -> Set[str]:
+        """Load the font and apply it to the Design 2 text node."""
+        try:
+            # Store the font path in properties
+            context.scene.nfc_card_props.font_path_2 = self.filepath
+
+            # Get the card object
+            card_obj = bpy.data.objects.get(OBJECT_NAME)
+            if not card_obj:
+                self.report({"ERROR"}, f"Card object '{OBJECT_NAME}' not found")
+                return {"CANCELLED"}
+
+            # Find the Logo Placer modifier
+            logo_placer_mod = card_obj.modifiers.get("Logo Placer")
+            if not logo_placer_mod or not hasattr(logo_placer_mod, "node_group"):
+                self.report({"ERROR"}, "Logo Placer modifier not found")
+                return {"CANCELLED"}
+
+            # Navigate to the Design Placement.001 node group within Logo Placer
+            logo_placer_tree = logo_placer_mod.node_group
+            design_placement_node = None
+            for node in logo_placer_tree.nodes:
+                if node.type == 'GROUP' and node.name == "Design 2 Input Values":
+                    design_placement_node = node
+                    break
+
+            if not design_placement_node or not design_placement_node.node_tree:
+                self.report({"ERROR"}, "Design 2 Input Values node group not found")
+                return {"CANCELLED"}
+
+            # Find the String to Curves node
+            design_placement_tree = design_placement_node.node_tree
+            string_to_curves = None
+            for node in design_placement_tree.nodes:
+                if node.type == 'STRING_TO_CURVES':
+                    string_to_curves = node
+                    break
+
+            if not string_to_curves:
+                self.report({"ERROR"}, "String to Curves node not found in Design 2")
+                return {"CANCELLED"}
+
+            # Load the font as a VectorFont data block
+            if self.filepath not in bpy.data.fonts:
+                font = bpy.data.fonts.load(self.filepath)
+            else:
+                font = bpy.data.fonts[self.filepath]
+
+            # Apply the font to the String to Curves node (it's a node property, not a socket)
+            string_to_curves.font = font
+
+            self.report(
+                {"INFO"},
+                f"Font loaded for Design 2: {os.path.basename(self.filepath)}",
+            )
+            return {"FINISHED"}
+
+        except Exception as e:
+            self.report({"ERROR"}, f"Failed to load font: {str(e)}")
+            return {"CANCELLED"}
+
+
 CLASSES = (
     OBJECT_OT_scene_setup,
     OBJECT_OT_nfc_toggle_boolean_option,
@@ -629,6 +795,8 @@ CLASSES = (
     OBJECT_OT_nfc_set_cavity_shape,
     OBJECT_OT_nfc_set_view,
     OBJECT_OT_nfc_export_stl,
+    OBJECT_OT_nfc_load_font_design1,
+    OBJECT_OT_nfc_load_font_design2,
 )
 
 

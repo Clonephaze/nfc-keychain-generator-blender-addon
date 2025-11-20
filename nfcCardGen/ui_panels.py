@@ -415,6 +415,169 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
         col.prop(props, f"qr_finder_style_{design_num}", text="")
 
 
+class VIEW3D_PT_tag_design_1_text(Panel):
+    """Panel for Design 1 text settings"""
+
+    bl_label = "Design 1 Text"
+    bl_idname = "VIEW3D_PT_tag_design_1_text"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "NFC Cards"
+    bl_parent_id = "VIEW3D_PT_tag_svg_to_mesh_design"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only show this panel if the scene is set up."""
+        return context.scene.nfc_card_props.scene_setup
+
+    def draw_header(self, context) -> None:
+        """Draw the panel header with toggle checkbox."""
+        props = context.scene.nfc_card_props
+        self.layout.prop(props, "design_1_text", text="")
+
+    def draw(self, context) -> None:
+        """Draw the Design 1 text settings panel."""
+        layout = self.layout
+        props = context.scene.nfc_card_props
+
+        # Disable the panel if text is not enabled
+        layout.enabled = props.design_1_text
+
+        if not props.scene_setup:
+            return
+
+        # Text content
+        layout.prop(props, "text_1", text="Text")
+
+        layout.separator(factor=0.5)
+
+        # Font selection
+        font_box = layout.box()
+        font_col = font_box.column(align=True)
+        if props.font_path_1:
+            import os
+            font_col.label(text=f"Font: {os.path.basename(props.font_path_1)}", icon="FONT_DATA")
+        else:
+            font_col.label(text="Font: Default", icon="FONT_DATA")
+        font_col.operator("object.nfc_load_font_design1", text="Load Custom Font", icon="FILEBROWSER")
+
+        layout.separator(factor=0.5)
+
+        # Text size
+        layout.prop(props, "text_size_1")
+
+        layout.separator(factor=0.5)
+
+        # Spacing settings
+        spacing_box = layout.box()
+        spacing_box.label(text="Spacing:")
+        spacing_col = spacing_box.column(align=True)
+        spacing_col.prop(props, "character_spacing_1")
+        spacing_col.prop(props, "word_spacing_1")
+        spacing_col.prop(props, "line_spacing_1")
+
+        layout.separator(factor=0.5)
+
+        # Text box dimensions
+        box_box = layout.box()
+        box_box.label(text="Text Box:")
+        box_col = box_box.column(align=True)
+        box_col.prop(props, "text_box_width_1")
+        box_col.prop(props, "text_box_height_1")
+
+        layout.separator(factor=0.5)
+
+        # Position offsets
+        offset_box = layout.box()
+        offset_box.label(text="Position:")
+        offset_col = offset_box.column(align=True)
+        offset_col.prop(props, "text_x_offset_1")
+        offset_col.prop(props, "text_y_offset_1")
+
+
+class VIEW3D_PT_tag_design_2_text(Panel):
+    """Panel for Design 2 text settings"""
+
+    bl_label = "Design 2 Text"
+    bl_idname = "VIEW3D_PT_tag_design_2_text"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "NFC Cards"
+    bl_parent_id = "VIEW3D_PT_tag_svg_to_mesh_design"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only show this panel if the scene is set up and shape is rectangle."""
+        props = context.scene.nfc_card_props
+        return props.scene_setup and props.shape_preset == "RECTANGLE"
+
+    def draw_header(self, context) -> None:
+        """Draw the panel header with toggle checkbox."""
+        props = context.scene.nfc_card_props
+        self.layout.prop(props, "design_2_text", text="")
+
+    def draw(self, context) -> None:
+        """Draw the Design 2 text settings panel."""
+        layout = self.layout
+        props = context.scene.nfc_card_props
+
+        # Disable the panel if text is not enabled
+        layout.enabled = props.design_2_text
+
+        if not props.scene_setup:
+            return
+
+        # Text content
+        layout.prop(props, "text_2", text="Text")
+
+        layout.separator(factor=0.5)
+
+        # Font selection
+        font_box = layout.box()
+        font_col = font_box.column(align=True)
+        if props.font_path_2:
+            import os
+            font_col.label(text=f"Font: {os.path.basename(props.font_path_2)}", icon="FONT_DATA")
+        else:
+            font_col.label(text="Font: Default", icon="FONT_DATA")
+        font_col.operator("object.nfc_load_font_design2", text="Load Custom Font", icon="FILEBROWSER")
+
+        layout.separator(factor=0.5)
+
+        # Text size
+        layout.prop(props, "text_size_2")
+
+        layout.separator(factor=0.5)
+
+        # Spacing settings
+        spacing_box = layout.box()
+        spacing_box.label(text="Spacing:")
+        spacing_col = spacing_box.column(align=True)
+        spacing_col.prop(props, "character_spacing_2")
+        spacing_col.prop(props, "word_spacing_2")
+        spacing_col.prop(props, "line_spacing_2")
+
+        layout.separator(factor=0.5)
+
+        # Text box dimensions
+        box_box = layout.box()
+        box_box.label(text="Text Box:")
+        box_col = box_box.column(align=True)
+        box_col.prop(props, "text_box_width_2")
+        box_col.prop(props, "text_box_height_2")
+
+        layout.separator(factor=0.5)
+
+        # Position offsets
+        offset_box = layout.box()
+        offset_box.label(text="Position:")
+        offset_col = offset_box.column(align=True)
+        offset_col.prop(props, "text_x_offset_2")
+        offset_col.prop(props, "text_y_offset_2")
+
+
 class VIEW3D_PT_tag_card_export(Panel):
     """Panel for STL export and final card information"""
 
@@ -528,12 +691,16 @@ def register() -> None:
     bpy.utils.register_class(VIEW3D_PT_tag_card_shape)
     bpy.utils.register_class(VIEW3D_PT_tag_card_magnet_and_cavity)
     bpy.utils.register_class(VIEW3D_PT_tag_svg_to_mesh_design)
+    bpy.utils.register_class(VIEW3D_PT_tag_design_1_text)
+    bpy.utils.register_class(VIEW3D_PT_tag_design_2_text)
     bpy.utils.register_class(VIEW3D_PT_tag_card_export)
 
 
 def unregister() -> None:
     """Unregister all panel classes from Blender."""
     bpy.utils.unregister_class(VIEW3D_PT_tag_card_export)
+    bpy.utils.unregister_class(VIEW3D_PT_tag_design_2_text)
+    bpy.utils.unregister_class(VIEW3D_PT_tag_design_1_text)
     bpy.utils.unregister_class(VIEW3D_PT_tag_svg_to_mesh_design)
     bpy.utils.unregister_class(VIEW3D_PT_tag_card_magnet_and_cavity)
     bpy.utils.unregister_class(VIEW3D_PT_tag_card_shape)

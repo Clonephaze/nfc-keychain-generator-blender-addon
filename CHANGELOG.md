@@ -1,12 +1,20 @@
 # Changelog
-## [1.1.8] - 2025-12-02
+## [1.1.8]
 ### Optimized
 - Reduced .blend file size by using Quick Asset Saver Add-on for saving the card to a clean small asset file. 
 - AppendInfo.blend goes from 5.4mb to 378kb
 - Backed up the original .blend file to originalcard.blend, used QuickAssetSaver Add-on to save the card in a much smaller library file. 
 
+### Added
+- Text overlay support for Design 1 and Design 2
+- Custom font loading for both designs (.ttf and .otf support)
+- Comprehensive text controls: size, character/word/line spacing
+- Text box dimension controls (width and height)
+- Text positioning with X/Y offset controls
+- Collapsible text panels in UI for clean organization
+- Cross-platform font file browser integration
 
-## [1.1.7] - 2025-11-18
+## [1.1.7] 
 
 ### Added
 - Viewport camera control operators for better workflow
@@ -23,7 +31,7 @@
 - Viewport not centering on card object after setup
 - View distance calculations for proper object framing
 
-## [1.1.6] - Previous Release
+## [1.1.6]
 
 ### Added
 - Base shapes: cards and circles with keychain loop options
@@ -50,6 +58,7 @@
 
 ## Version History
 
+- **[1.2.0]** - Text overlay and custom font support
 - **[1.1.8]** - .blend file size optimization
 - **[1.1.7]** - Viewport camera controls and automation
 - **[1.1.6]** - Core functionality and features
