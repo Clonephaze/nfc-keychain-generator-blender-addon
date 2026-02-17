@@ -12,6 +12,8 @@ import math
 import traceback
 from typing import Optional
 
+import numpy as np
+
 import bmesh
 import bpy
 from bpy.types import Object, Operator
@@ -701,7 +703,8 @@ class OBJECT_OT_nfc_generate_qr(Operator):
                 module_style = props.qr_module_style_2
                 finder_style = props.qr_finder_style_2
 
-            finder_border_style = self._determine_border_style(finder_style)
+            # Border shape matches the finder center style
+            finder_border_style = finder_style
 
             # Build mesh directly via BMesh – no SVG intermediary
             design_obj = self._build_qr_mesh(
@@ -745,6 +748,60 @@ class OBJECT_OT_nfc_generate_qr(Operator):
             return {"CANCELLED"}
 
         return {"FINISHED"}
+
+    # ------------------------------------------------------------------
+    #  QR matrix analysis helpers
+    # ------------------------------------------------------------------
+
+    def _get_finder_positions(self, qr_size: int) -> list:
+        """Get positions of the three finder patterns."""
+        offset = FINDER_PATTERN_SIZE // 2
+        return [
+            {"row": offset, "col": offset},
+            {"row": offset, "col": qr_size - offset - 1},
+            {"row": qr_size - offset - 1, "col": offset},
+        ]
+
+    def _is_in_finder_area(self, row: int, col: int, finder_positions: list) -> bool:
+        """Check if a module is within any finder pattern area."""
+        half_size = FINDER_PATTERN_SIZE // 2
+        for finder in finder_positions:
+            if (
+                abs(row - finder["row"]) <= half_size
+                and abs(col - finder["col"]) <= half_size
+            ):
+                return True
+        return False
+
+    def _analyze_neighbors(self, matrix) -> dict:
+        """Analyze QR matrix to determine which corners should be rounded.
+
+        Uses NumPy array slicing for efficient neighbor detection.
+        Returns dict mapping (row, col) to rounded corner flags.
+        """
+        arr = np.array(matrix, dtype=bool)
+        height, width = arr.shape
+        padded = np.pad(arr, pad_width=1, mode="constant", constant_values=False)
+
+        north = padded[:-2, 1:-1]
+        south = padded[2:, 1:-1]
+        west = padded[1:-1, :-2]
+        east = padded[1:-1, 2:]
+
+        corners = {}
+        filled = np.argwhere(arr)
+
+        for row, col in filled:
+            round_corners = {
+                "tl": not north[row, col] and not west[row, col],
+                "tr": not north[row, col] and not east[row, col],
+                "br": not south[row, col] and not east[row, col],
+                "bl": not south[row, col] and not west[row, col],
+            }
+            if any(round_corners.values()):
+                corners[(row, col)] = round_corners
+
+        return corners
 
     # ------------------------------------------------------------------
     #  Direct BMesh QR mesh construction

@@ -2,6 +2,9 @@
 ## [1.2.0]
 
 ### Added
+- 3MF export with per-face material colours for multi-colour slicing in Orca Slicer / BambuStudio / PrusaSlicer
+- Automatic detection of the ThreeMF-io extension (soft dependency — 3MF option only shown when installed)
+- Export format toggle in the UI (3MF / STL) with info text explaining 3MF benefits
 - Boolean solver choice (Exact / Fast) for design boolean operations in the UI
 - Diagnostic error reporting for SVG-to-mesh pipeline failures (logo placer node group, design input node, assignment errors)
 

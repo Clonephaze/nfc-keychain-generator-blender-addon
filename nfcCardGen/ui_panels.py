@@ -623,12 +623,48 @@ class VIEW3D_PT_tag_card_export(Panel):
         return info_lines
 
     def _draw_export_section(self, layout, props) -> None:
-        """Draw the export box and printing tips."""
+        """Draw the export box with format selector and printing tips."""
+        from .operators import _is_3mf_available
+
         export_box = layout.box()
         export_box.label(text="Export for 3D Printing", icon="EXPORT")
-        export_box.operator(
-            "object.nfc_export_stl", text="Export STL", icon="MESH_DATA"
-        )
+
+        has_3mf = _is_3mf_available()
+
+
+        if has_3mf:
+            # Show format toggle only when both options are actually usable
+            row = export_box.row(align=True)
+            row.prop(props, "export_format", expand=True)
+            
+            if props.export_format == "3MF":
+                export_box.operator(
+                    "object.nfc_export_3mf",
+                    text="Export 3MF",
+                    icon="MESH_DATA",
+                )
+                info = export_box.column(align=True)
+                info.scale_y = 0.7
+                info.label(text="• Includes material color data")
+                info.label(text="• Orca/Bambu and Prusa Slicer support")
+            else:
+                export_box.operator(
+                    "object.nfc_export_stl", text="Export STL", icon="MESH_DATA"
+                )
+                info = export_box.column(align=True)
+                info.scale_y = 0.7
+                info.label(text="• STL holds no color data")
+                info.label(text="• Read guide for manual coloring tips")                
+        else:
+            export_box.operator(
+                "object.nfc_export_stl", text="Export STL", icon="MESH_DATA"
+            )
+            info = export_box.column(align=True)
+            info.scale_y = 0.7
+            info.label(text="• STL holds no color data")
+            info.label(text="• Read guide for manual coloring tips")
+            info.label(text="• Install 3MF add-on for automatic coloring")
+
         self._draw_printing_tips(export_box)
 
     def _draw_printing_tips(self, export_box) -> None:

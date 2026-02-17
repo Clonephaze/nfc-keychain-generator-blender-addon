@@ -28,6 +28,70 @@ from .utils import (
 )
 
 
+def _find_3mf_export():
+    """Locate the ``export_3mf`` function from the 3MF IO addon.
+
+    Searches both legacy addon paths and Blender 4.2+ extension
+    repositories so installation method doesn't matter.
+    """
+    import importlib
+    import pkgutil
+
+    # 1. Direct import (legacy / same-repo addon)
+    try:
+        from io_mesh_3mf.api import export_3mf
+        return export_3mf
+    except ImportError:
+        pass
+
+    # 2. Scan Blender extension repositories
+    try:
+        import bl_ext  # noqa: F401 – only exists inside Blender 4.2+
+    except ImportError:
+        return None
+
+    for repo_attr in dir(bl_ext):
+        if repo_attr.startswith("_"):
+            continue
+        repo = getattr(bl_ext, repo_attr, None)
+        repo_path = getattr(repo, "__path__", None)
+        if not repo_path:
+            continue
+        for _importer, pkg_name, is_pkg in pkgutil.iter_modules(repo_path):
+            if not is_pkg:
+                continue
+            # Only attempt packages whose name hints at 3MF
+            if "3mf" not in pkg_name.lower() and "threemf" not in pkg_name.lower():
+                continue
+            try:
+                mod = importlib.import_module(f"bl_ext.{repo_attr}.{pkg_name}.api")
+                fn = getattr(mod, "export_3mf", None)
+                if fn:
+                    return fn
+            except (ImportError, AttributeError, ModuleNotFoundError):
+                continue
+
+    return None
+
+
+# Cached on first call so the scan only runs once per session.
+_3mf_export_fn: object = None  # Will hold the function or False
+
+
+def _get_3mf_export():
+    """Return the cached ``export_3mf`` callable, or *None*."""
+    global _3mf_export_fn
+    if _3mf_export_fn is None:
+        result = _find_3mf_export()
+        _3mf_export_fn = result if result else False
+    return _3mf_export_fn if _3mf_export_fn else None
+
+
+def _is_3mf_available() -> bool:
+    """Check whether the 3MF IO addon with its public API is installed."""
+    return _get_3mf_export() is not None
+
+
 class OBJECT_OT_scene_setup(Operator):
     """Create a new scene and load the pre-built NFC card setup (non-destructive)"""
 
@@ -634,6 +698,100 @@ class OBJECT_OT_nfc_export_stl(Operator, ExportHelper):
             return {"CANCELLED"}
 
 
+class OBJECT_OT_nfc_export_3mf(Operator, ExportHelper):
+    """Export the NFC card to 3MF format with material data for multi-color slicers"""
+
+    bl_idname = "object.nfc_export_3mf"
+    bl_label = "Export 3MF"
+    bl_description = "Export the NFC card as a 3MF file with material colors for Orca/PrusaSlicer"
+    bl_options = {"REGISTER", "UNDO"}
+
+    filename_ext = ".3mf"
+    filter_glob: StringProperty(
+        default="*.3mf",
+        options={"HIDDEN"},
+        maxlen=255,
+    )
+
+    @classmethod
+    def poll(cls, context) -> bool:
+        """Only available when io_mesh_3mf is installed."""
+        return _is_3mf_available()
+
+    def execute(self, context):
+        """Execute the 3MF export operation."""
+        export_3mf = _get_3mf_export()
+        if not export_3mf:
+            self.report(
+                {"ERROR"},
+                "3MF IO addon not found. Install it from Extensions to enable 3MF export.",
+            )
+            return {"CANCELLED"}
+
+        card_obj = bpy.data.objects.get(OBJECT_NAME)
+        if not card_obj:
+            self.report(
+                {"ERROR"},
+                f"Card object '{OBJECT_NAME}' not found. Please set up the scene first.",
+            )
+            return {"CANCELLED"}
+
+        # GN Set Material nodes create material slots only on the evaluated
+        # object.  The 3MF exporter reads the *original* object's slots, so
+        # we rebuild them to exactly match the evaluated object's slot order.
+        # This ensures face material_index values reference the correct slot.
+        self._sync_evaluated_materials(context, card_obj)
+
+        warnings_collected: list[str] = []
+
+        result = export_3mf(
+            filepath=self.filepath,
+            objects=[card_obj],
+            use_mesh_modifiers=True,
+            use_orca_format="BASEMATERIAL",
+            global_scale=1.0,
+            # Passing object_settings routes through the Orca exporter which
+            # writes colorgroups + paint_color attributes that Orca/BambuStudio
+            # actually reads.  Standard basematerials pid/p1 are ignored by Orca.
+            object_settings={card_obj: {}},
+            on_warning=lambda msg: warnings_collected.append(msg),
+        )
+
+        if result.status != "FINISHED":
+            self.report({"ERROR"}, f"3MF export failed: {'; '.join(result.warnings)}")
+            return {"CANCELLED"}
+
+        for w in warnings_collected:
+            self.report({"WARNING"}, w)
+
+        self.report(
+            {"INFO"},
+            f"3MF exported successfully to: {os.path.basename(self.filepath)}",
+        )
+        return {"FINISHED"}
+
+    @staticmethod
+    def _sync_evaluated_materials(context, obj):
+        """Rebuild the original object's material slots to match the evaluated object.
+
+        GN ``Set Material`` nodes add materials only to the evaluated
+        depsgraph copy.  The 3MF exporter reads the original object's
+        slots and uses ``face.material_index`` from the evaluated mesh.
+        To keep them in sync we clear the original's slots and rebuild
+        them in the exact same order as the evaluated object.
+        """
+        depsgraph = context.evaluated_depsgraph_get()
+        eval_obj = obj.evaluated_get(depsgraph)
+
+        # Collect the evaluated slot list in order
+        eval_materials = [slot.material for slot in eval_obj.material_slots]
+
+        # Rebuild original slots to match
+        obj.data.materials.clear()
+        for mat in eval_materials:
+            obj.data.materials.append(mat)
+
+
 class OBJECT_OT_nfc_load_font(Operator, ImportHelper):
     """Load a custom font for a design's text"""
 
@@ -741,6 +899,7 @@ CLASSES = (
     OBJECT_OT_nfc_set_cavity_shape,
     OBJECT_OT_nfc_set_view,
     OBJECT_OT_nfc_export_stl,
+    OBJECT_OT_nfc_export_3mf,
     OBJECT_OT_nfc_load_font,
 )
 

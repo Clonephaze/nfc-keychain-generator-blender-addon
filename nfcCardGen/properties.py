@@ -346,6 +346,17 @@ class NFCCardProperties(PropertyGroup):
         update=update_design_boolean_solver,
     )
 
+    # Export settings
+    export_format: EnumProperty(
+        name="Export Format",
+        description="File format for card export",
+        items=[
+            ("3MF", "3MF", "Export with material data for multi-color slicers (requires 3MF IO addon)"),
+            ("STL", "STL", "Standard mesh export for single-color printing"),
+        ],
+        default="3MF",
+    )
+
     # Design 1 properties
     offset_x_1: bpy.props.FloatProperty(
         name="Design 1 X Offset",
