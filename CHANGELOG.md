@@ -1,4 +1,23 @@
 # Changelog
+## [1.2.0]
+
+### Added
+- Boolean solver choice (Exact / Fast) for design boolean operations in the UI
+- Diagnostic error reporting for SVG-to-mesh pipeline failures (logo placer node group, design input node, assignment errors)
+
+### Fixed
+- NFC cavity choice modifier sync error on file reload ("Could not sync 1 modifier values: NFC_CAVITY_CHOICE")
+- QR mode toggle not resetting the design flag when switching between QR and SVG modes
+- ROUNDED QR module style rendering incorrectly
+- SVG import now extrudes each path individually before joining, producing correct geometry for multi-path designs
+- Boolean self-union applied to imported SVG meshes to resolve overlapping shell issues
+- QR code mesh Z-origin now centred for proper card placement
+
+### Changed
+- QR code generation rewritten to use direct BMesh construction instead of SVG intermediary
+- SVG import pipeline dramatically faster — per-path extrusion and manifold-making now completes most tested designs in under a second
+- Modifier-to-property sync rewritten with dictionary-based enum conversion for robustness
+
 ## [1.1.8]
 ### Optimized
 - Reduced .blend file size by using Quick Asset Saver Add-on for saving the card to a clean small asset file. 
@@ -58,7 +77,7 @@
 
 ## Version History
 
-- **[1.2.0]** - Text overlay and custom font support
+- **[1.2.0]** - Boolean solver UI, QR BMesh rewrite, dead code cleanup, bug fixes
 - **[1.1.8]** - .blend file size optimization
 - **[1.1.7]** - Viewport camera controls and automation
 - **[1.1.6]** - Core functionality and features

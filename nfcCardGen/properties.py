@@ -40,242 +40,72 @@ def update_property(self, context, prop_name, logical_name, value):
 
 
 # Property-specific update callbacks that delegate to the generic function
-def update_corner_radii(self, context):
-    """Update callback for corner_radius property."""
-    update_property(self, context, "corner_radius", "CORNER_RADII", self.corner_radius)
-
-
-def update_keychain_choice(self, context):
-    """Update callback for keychain_choice property."""
-    update_property(
-        self, context, "keychain_choice", "KEYCHAIN_CHOICE", self.keychain_choice
-    )
-
-
-def update_initial_height(self, context):
-    """Update callback for initial_height property."""
-    update_property(
-        self, context, "initial_height", "INITIAL_HEIGHT", self.initial_height
-    )
-
-
-def update_magnet_choice(self, context):
-    """Update callback for magnet_choice property."""
-    update_property(self, context, "magnet_choice", "MAGNET_CHOICE", self.magnet_choice)
-
-
-def update_magnet_depth(self, context):
-    """Update callback for magnet_depth property."""
-    update_property(self, context, "magnet_depth", "MAGNET_DEPTH", self.magnet_depth)
-
-
-def update_nfc_cutout(self, context):
-    """Update callback for nfc_choice property."""
-    update_property(self, context, "nfc_choice", "NFC_CHOICE", self.nfc_choice)
-
-
-def update_bevel_amount(self, context):
-    """Update callback for bevel_amount property."""
-    update_property(self, context, "bevel_amount", "BEVEL_AMOUNT", self.bevel_amount)
-
-
-def update_bevel_segment_count(self, context):
-    """Update callback for bevel_segments property."""
-    update_property(
-        self, context, "bevel_segments", "BEVEL_SEGMENTS", self.bevel_segments
-    )
-
-
-def update_mag_shape(self, context):
-    """Update callback for mag_shape property."""
-    update_property(self, context, "mag_shape", "MAG_SHAPE", self.mag_shape)
-
-
-def update_mag_width(self, context):
-    """Update callback for mag_width property."""
-    update_property(self, context, "mag_width", "MAG_WIDTH", self.mag_width)
-
-
-def update_mag_taper(self, context):
-    """Update callback for mag_taper property."""
-    update_property(self, context, "mag_taper", "MAG_TAPER", self.mag_taper)
-
-
-def update_mag_padding(self, context):
-    """Update callback for MAG_EDGE_PAD property."""
-    update_property(self, context, "mag_padding", "MAG_EDGE_PAD", self.mag_padding)
-
-
-def update_inset_choice(self, context):
-    """Update callback for inset_choice property."""
-    update_property(self, context, "inset_choice", "INSET_CHOICE", self.inset_choice)
-
-
-def update_offset_x_1(self, context):
-    """Update callback for offset_x_1 property."""
-    update_property(self, context, "offset_x_1", "OFFSET_X_1", self.offset_x_1)
-
-
-def update_offset_y_1(self, context):
-    """Update callback for offset_y_1 property."""
-    update_property(self, context, "offset_y_1", "OFFSET_Y_1", self.offset_y_1)
-
-
-def update_scale_1(self, context):
-    """Update callback for scale_1 property."""
-    update_property(self, context, "scale_1", "SCALE_1", self.scale_1)
-
-
-def update_offset_x_2(self, context):
-    """Update callback for offset_x_2 property."""
-    update_property(self, context, "offset_x_2", "OFFSET_X_2", self.offset_x_2)
-
-
-def update_offset_y_2(self, context):
-    """Update callback for offset_y_2 property."""
-    update_property(self, context, "offset_y_2", "OFFSET_Y_2", self.offset_y_2)
-
-
-def update_scale_2(self, context):
-    """Update callback for scale_2 property."""
-    update_property(self, context, "scale_2", "SCALE_2", self.scale_2)
-
-
-def update_nfc_cavity_height(self, context):
-    """Update callback for nfc_cavity_height property."""
-    update_property(
-        self, context, "nfc_cavity_height", "NFC_CAVITY_HEIGHT", self.nfc_cavity_height
-    )
-
-
-# Text property update callbacks - Design 1
-def update_design_1_text(self, context):
-    """Update callback for design_1_text property."""
-    update_property(self, context, "design_1_text", "DESIGN_1_TEXT", self.design_1_text)
-
-
-def update_text_1(self, context):
-    """Update callback for text_1 property."""
-    update_property(self, context, "text_1", "TEXT_1", self.text_1)
-
-
-def update_text_size_1(self, context):
-    """Update callback for text_size_1 property."""
-    update_property(self, context, "text_size_1", "TEXT_SIZE_1", self.text_size_1)
-
-
-def update_character_spacing_1(self, context):
-    """Update callback for character_spacing_1 property."""
-    update_property(
-        self, context, "character_spacing_1", "CHARACTER_SPACING_1", self.character_spacing_1
-    )
-
-
-def update_word_spacing_1(self, context):
-    """Update callback for word_spacing_1 property."""
-    update_property(
-        self, context, "word_spacing_1", "WORD_SPACING_1", self.word_spacing_1
-    )
-
-
-def update_line_spacing_1(self, context):
-    """Update callback for line_spacing_1 property."""
-    update_property(
-        self, context, "line_spacing_1", "LINE_SPACING_1", self.line_spacing_1
-    )
-
-
-def update_text_box_width_1(self, context):
-    """Update callback for text_box_width_1 property."""
-    update_property(
-        self, context, "text_box_width_1", "TEXT_BOX_WIDTH_1", self.text_box_width_1
-    )
-
-
-def update_text_box_height_1(self, context):
-    """Update callback for text_box_height_1 property."""
-    update_property(
-        self, context, "text_box_height_1", "TEXT_BOX_HEIGHT_1", self.text_box_height_1
-    )
-
-
-def update_text_x_offset_1(self, context):
-    """Update callback for text_x_offset_1 property."""
-    update_property(
-        self, context, "text_x_offset_1", "TEXT_X_OFFSET_1", self.text_x_offset_1
-    )
-
-
-def update_text_y_offset_1(self, context):
-    """Update callback for text_y_offset_1 property."""
-    update_property(
-        self, context, "text_y_offset_1", "TEXT_Y_OFFSET_1", self.text_y_offset_1
-    )
-
-
-# Text property update callbacks - Design 2
-def update_design_2_text(self, context):
-    """Update callback for design_2_text property."""
-    update_property(self, context, "design_2_text", "DESIGN_2_TEXT", self.design_2_text)
-
-
-def update_text_2(self, context):
-    """Update callback for text_2 property."""
-    update_property(self, context, "text_2", "TEXT_2", self.text_2)
-
-
-def update_text_size_2(self, context):
-    """Update callback for text_size_2 property."""
-    update_property(self, context, "text_size_2", "TEXT_SIZE_2", self.text_size_2)
-
-
-def update_character_spacing_2(self, context):
-    """Update callback for character_spacing_2 property."""
-    update_property(
-        self, context, "character_spacing_2", "CHARACTER_SPACING_2", self.character_spacing_2
-    )
-
-
-def update_word_spacing_2(self, context):
-    """Update callback for word_spacing_2 property."""
-    update_property(
-        self, context, "word_spacing_2", "WORD_SPACING_2", self.word_spacing_2
-    )
-
-
-def update_line_spacing_2(self, context):
-    """Update callback for line_spacing_2 property."""
-    update_property(
-        self, context, "line_spacing_2", "LINE_SPACING_2", self.line_spacing_2
-    )
-
-
-def update_text_box_width_2(self, context):
-    """Update callback for text_box_width_2 property."""
-    update_property(
-        self, context, "text_box_width_2", "TEXT_BOX_WIDTH_2", self.text_box_width_2
-    )
-
-
-def update_text_box_height_2(self, context):
-    """Update callback for text_box_height_2 property."""
-    update_property(
-        self, context, "text_box_height_2", "TEXT_BOX_HEIGHT_2", self.text_box_height_2
-    )
-
-
-def update_text_x_offset_2(self, context):
-    """Update callback for text_x_offset_2 property."""
-    update_property(
-        self, context, "text_x_offset_2", "TEXT_X_OFFSET_2", self.text_x_offset_2
-    )
-
-
-def update_text_y_offset_2(self, context):
-    """Update callback for text_y_offset_2 property."""
-    update_property(
-        self, context, "text_y_offset_2", "TEXT_Y_OFFSET_2", self.text_y_offset_2
-    )
+def _make_updater(prop_attr: str, logical_name: str):
+    """Factory that creates an update callback for a Blender property.
+
+    Args:
+        prop_attr: The attribute name on the PropertyGroup (e.g. "corner_radius")
+        logical_name: The key in MOD_OPT_MAPPING (e.g. "CORNER_RADII")
+    """
+    def _update(self, context):
+        update_property(self, context, prop_attr, logical_name, getattr(self, prop_attr))
+    return _update
+
+
+# Shape & dimension callbacks
+update_corner_radii = _make_updater("corner_radius", "CORNER_RADII")
+update_keychain_choice = _make_updater("keychain_choice", "KEYCHAIN_CHOICE")
+update_initial_height = _make_updater("initial_height", "INITIAL_HEIGHT")
+update_magnet_choice = _make_updater("magnet_choice", "MAGNET_CHOICE")
+update_magnet_depth = _make_updater("magnet_depth", "MAGNET_DEPTH")
+update_nfc_cutout = _make_updater("nfc_choice", "NFC_CHOICE")
+update_bevel_amount = _make_updater("bevel_amount", "BEVEL_AMOUNT")
+update_bevel_segment_count = _make_updater("bevel_segments", "BEVEL_SEGMENTS")
+
+# Magnet callbacks
+update_mag_shape = _make_updater("mag_shape", "MAG_SHAPE")
+update_mag_width = _make_updater("mag_width", "MAG_WIDTH")
+update_mag_taper = _make_updater("mag_taper", "MAG_TAPER")
+update_mag_padding = _make_updater("mag_padding", "MAG_EDGE_PAD")
+
+# Design layout callbacks
+update_inset_choice = _make_updater("inset_choice", "INSET_CHOICE")
+
+def update_design_boolean_solver(self, context):
+    """Update the boolean solver on Logo Placer Mesh Boolean nodes."""
+    from .utils import update_design_boolean_solver as _apply_solver
+    _apply_solver(self.design_boolean_solver)
+update_offset_x_1 = _make_updater("offset_x_1", "OFFSET_X_1")
+update_offset_y_1 = _make_updater("offset_y_1", "OFFSET_Y_1")
+update_scale_1 = _make_updater("scale_1", "SCALE_1")
+update_offset_x_2 = _make_updater("offset_x_2", "OFFSET_X_2")
+update_offset_y_2 = _make_updater("offset_y_2", "OFFSET_Y_2")
+update_scale_2 = _make_updater("scale_2", "SCALE_2")
+update_nfc_cavity_height = _make_updater("nfc_cavity_height", "NFC_CAVITY_HEIGHT")
+
+# Text callbacks – Design 1
+update_design_1_text = _make_updater("design_1_text", "DESIGN_1_TEXT")
+update_text_1 = _make_updater("text_1", "TEXT_1")
+update_text_size_1 = _make_updater("text_size_1", "TEXT_SIZE_1")
+update_character_spacing_1 = _make_updater("character_spacing_1", "CHARACTER_SPACING_1")
+update_word_spacing_1 = _make_updater("word_spacing_1", "WORD_SPACING_1")
+update_line_spacing_1 = _make_updater("line_spacing_1", "LINE_SPACING_1")
+update_text_box_width_1 = _make_updater("text_box_width_1", "TEXT_BOX_WIDTH_1")
+update_text_box_height_1 = _make_updater("text_box_height_1", "TEXT_BOX_HEIGHT_1")
+update_text_x_offset_1 = _make_updater("text_x_offset_1", "TEXT_X_OFFSET_1")
+update_text_y_offset_1 = _make_updater("text_y_offset_1", "TEXT_Y_OFFSET_1")
+
+# Text callbacks – Design 2
+update_design_2_text = _make_updater("design_2_text", "DESIGN_2_TEXT")
+update_text_2 = _make_updater("text_2", "TEXT_2")
+update_text_size_2 = _make_updater("text_size_2", "TEXT_SIZE_2")
+update_character_spacing_2 = _make_updater("character_spacing_2", "CHARACTER_SPACING_2")
+update_word_spacing_2 = _make_updater("word_spacing_2", "WORD_SPACING_2")
+update_line_spacing_2 = _make_updater("line_spacing_2", "LINE_SPACING_2")
+update_text_box_width_2 = _make_updater("text_box_width_2", "TEXT_BOX_WIDTH_2")
+update_text_box_height_2 = _make_updater("text_box_height_2", "TEXT_BOX_HEIGHT_2")
+update_text_x_offset_2 = _make_updater("text_x_offset_2", "TEXT_X_OFFSET_2")
+update_text_y_offset_2 = _make_updater("text_y_offset_2", "TEXT_Y_OFFSET_2")
 
 
 class NFCCardProperties(PropertyGroup):
@@ -285,6 +115,19 @@ class NFCCardProperties(PropertyGroup):
     These properties will be exposed in the UI panel and passed to
     geometry node groups for card generation.
     """
+
+    # ---- Computed height helpers ----
+    def get_card_height(self) -> float:
+        """Card body height before design layer is added."""
+        return (
+            self.initial_height
+            + (self.magnet_depth if self.magnet_choice else 0)
+            + (0.8 if self.nfc_choice else 0)
+        )
+
+    def get_final_height(self) -> float:
+        """Total height including the design layer (0.6 mm unless inset)."""
+        return self.get_card_height() + (0.6 if not self.inset_choice else 0)
 
     # Scene setup tracking
     scene_setup: BoolProperty(
@@ -487,6 +330,20 @@ class NFCCardProperties(PropertyGroup):
         description="Add an inset design to the card",
         default=False,
         update=update_inset_choice,
+    )
+
+    design_boolean_solver: EnumProperty(
+        name="Boolean Solver",
+        description=(
+            "Boolean solver for design placement. "
+            "Manifold is faster but Exact handles problematic geometry better"
+        ),
+        items=[
+            ("MANIFOLD", "Manifold", "Fast solver, works well with clean geometry"),
+            ("EXACT", "Exact", "Slower but more robust for complex or self-intersecting shapes"),
+        ],
+        default="MANIFOLD",
+        update=update_design_boolean_solver,
     )
 
     # Design 1 properties
@@ -1059,13 +916,12 @@ class NFCCardProperties(PropertyGroup):
         name="QR Module Style 1",
         description="Shape style for QR code data modules",
         items=[
-            # NOTE: SQUARE option removed - causes non-manifold geometry issues with BMesh processing
-            # ("SQUARE", "Square", "Standard square modules"),
+            ("SQUARE", "Square", "Standard square modules"),
             ("ROUNDED", "Rounded", "Adaptive rounded corners for organic flow"),
             ("CIRCLE", "Circle", "Circular modules"),
             ("SQUIRCLE", "Squircle", "Super-ellipse modules"),
         ],
-        default="ROUNDED",  # Changed from SQUARE - more reliable with BMesh processing
+        default="ROUNDED",
     )
 
     qr_finder_style_1: bpy.props.EnumProperty(
@@ -1095,13 +951,12 @@ class NFCCardProperties(PropertyGroup):
         name="QR Module Style 2",
         description="Shape style for QR code data modules",
         items=[
-            # NOTE: SQUARE option removed - causes non-manifold geometry issues with BMesh processing
-            # ("SQUARE", "Square", "Standard square modules"),
+            ("SQUARE", "Square", "Standard square modules"),
             ("ROUNDED", "Rounded", "Adaptive rounded corners for organic flow"),
             ("CIRCLE", "Circle", "Circular modules"),
             ("SQUIRCLE", "Squircle", "Super-ellipse modules"),
         ],
-        default="ROUNDED",  # Changed from SQUARE - more reliable with BMesh processing
+        default="ROUNDED",
     )
 
     qr_finder_style_2: bpy.props.EnumProperty(

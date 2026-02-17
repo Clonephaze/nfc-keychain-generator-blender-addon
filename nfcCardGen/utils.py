@@ -223,6 +223,59 @@ def setup_driver_connection(
         return False
 
 
+def update_design_boolean_solver(solver_value, report_func=None):
+    """Set the boolean solver on all Mesh Boolean nodes inside the Logo Placer node group.
+
+    Args:
+        solver_value (str): 'MANIFOLD' or 'EXACT'
+        report_func (callable, optional): Blender operator report function for error messages
+
+    Returns:
+        bool: True if at least one node was updated, False otherwise
+    """
+    # Find the Logo Placer node group (flexible match)
+    logo_ng = None
+    for ng_name in bpy.data.node_groups.keys():
+        if "logo" in ng_name.lower() and "placer" in ng_name.lower():
+            logo_ng = bpy.data.node_groups[ng_name]
+            break
+    if logo_ng is None:
+        logo_ng = bpy.data.node_groups.get("Logo Placer")
+    if logo_ng is None:
+        if report_func:
+            report_func({"ERROR"}, "Logo Placer node group not found")
+        return False
+
+    updated = False
+    for node in logo_ng.nodes:
+        if node.type == 'MESH_BOOLEAN' and hasattr(node, 'solver'):
+            node.solver = solver_value
+            updated = True
+    return updated
+
+
+def get_design_boolean_solver():
+    """Read the current boolean solver from the Logo Placer node group.
+
+    Returns:
+        str: 'MANIFOLD' or 'EXACT', or None if not found
+    """
+    logo_ng = None
+    for ng_name in bpy.data.node_groups.keys():
+        if "logo" in ng_name.lower() and "placer" in ng_name.lower():
+            logo_ng = bpy.data.node_groups[ng_name]
+            break
+    if logo_ng is None:
+        logo_ng = bpy.data.node_groups.get("Logo Placer")
+    if logo_ng is None:
+        return None
+
+    for node in logo_ng.nodes:
+        if node.type == 'MESH_BOOLEAN' and hasattr(node, 'solver'):
+            return node.solver
+    return None
+
+
 def update_modifier_input(modifier_name, socket_name, value, report_func=None):
     """Update a specific input on a geometry nodes modifier.
 

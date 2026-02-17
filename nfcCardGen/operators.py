@@ -188,21 +188,46 @@ class OBJECT_OT_scene_setup(Operator):
 
     def _sync_modifier_values_to_props(self, context, card_obj) -> None:
         """Fetch modifier values and update scene properties"""
+        # Menu sockets store integers; map them back to EnumProperty identifiers
+        _ENUM_INT_TO_STR = {
+            "SHAPE_CHOICE": {0: "RECTANGLE", 1: "CIRCLE"},
+            "MAG_SHAPE": {0: "CIRCLE", 1: "HEXAGON"},
+            "NFC_CAVITY_CHOICE": {0: "RECTANGLE", 1: "CIRCLE", 2: "DOUBLE_CIRCLE"},
+        }
+        # Where logical_name.lower() doesn't match the actual property name
+        _PROP_NAME_OVERRIDES = {
+            "SHAPE_CHOICE": "shape_preset",
+            "CORNER_RADII": "corner_radius",
+        }
+
+        failed = []
         for logical_name, (modifier_name, socket_name) in MOD_OPT_MAPPING.items():
             try:
                 value = get_modifier_value(card_obj, modifier_name, socket_name)
                 if value is not None:
-                    # Special handling for enum properties that are stored as integers in geometry nodes
-                    if logical_name == "MAG_SHAPE":
-                        # Convert integer value to string enum value
-                        # 0 = "CIRCLE", 1 = "HEXAGON"
-                        value = "CIRCLE" if value == 0 else "HEXAGON"
+                    # Convert integer menu-socket values to string enum identifiers
+                    enum_map = _ENUM_INT_TO_STR.get(logical_name)
+                    if enum_map is not None:
+                        value = enum_map.get(value, next(iter(enum_map.values())))
 
-                    setattr(context.scene.nfc_card_props, logical_name.lower(), value)
-            except Exception as e:
-                print(
-                    f"Warning: Could not fetch initial value for {logical_name}: {str(e)}"
-                )
+                    prop_name = _PROP_NAME_OVERRIDES.get(
+                        logical_name, logical_name.lower()
+                    )
+                    setattr(context.scene.nfc_card_props, prop_name, value)
+            except Exception:
+                failed.append(logical_name)
+
+        if failed:
+            self.report(
+                {"WARNING"},
+                f"Could not sync {len(failed)} modifier values: {', '.join(failed)}",
+            )
+
+        # Sync the design boolean solver (node-level property, not a socket)
+        from .utils import get_design_boolean_solver
+        solver = get_design_boolean_solver()
+        if solver is not None:
+            context.scene.nfc_card_props.design_boolean_solver = solver
 
     def _setup_modifier_drivers(self, card_obj) -> None:
         """Set up drivers between modifiers based on DRIVER_MAPPINGS"""
@@ -246,28 +271,16 @@ class OBJECT_OT_nfc_toggle_boolean_option(Operator):
         """Toggle the boolean option via the modifier socket."""
         props = context.scene.nfc_card_props
 
-        # Get current value and toggle it
+        # Setting the property triggers its update callback, which handles
+        # modifier updates and geometry refresh automatically.
         if self.option_type == "MAGNET_CHOICE":
-            current_value = props.magnet_choice
-            props.magnet_choice = not current_value
-            new_value = props.magnet_choice
+            props.magnet_choice = not props.magnet_choice
         elif self.option_type == "INSET_CHOICE":
-            current_value = props.inset_choice
-            props.inset_choice = not current_value
-            new_value = props.inset_choice
+            props.inset_choice = not props.inset_choice
         elif self.option_type == "KEYCHAIN_CHOICE":
-            current_value = props.keychain_choice
-            props.keychain_choice = not current_value
-            new_value = props.keychain_choice
+            props.keychain_choice = not props.keychain_choice
 
-        print(f"Toggling {self.option_type}: {current_value} -> {new_value}")
-
-        if update_modifier_option(self.option_type, new_value, self.report):
-            force_update_ui_and_geometry(context, self.option_type.lower())
-
-            return {"FINISHED"}
-        else:
-            return {"CANCELLED"}
+        return {"FINISHED"}
 
 
 class OBJECT_OT_nfc_set_shape_preset(Operator):
@@ -621,18 +634,26 @@ class OBJECT_OT_nfc_export_stl(Operator, ExportHelper):
             return {"CANCELLED"}
 
 
-class OBJECT_OT_nfc_load_font_design1(Operator, ImportHelper):
-    """Load a custom font for Design 1 text"""
+class OBJECT_OT_nfc_load_font(Operator, ImportHelper):
+    """Load a custom font for a design's text"""
 
-    bl_idname = "object.nfc_load_font_design1"
+    bl_idname = "object.nfc_load_font"
     bl_label = "Load Font"
-    bl_description = "Load a custom TrueType or OpenType font for Design 1 text"
+    bl_description = "Load a custom TrueType or OpenType font"
     bl_options = {"REGISTER", "UNDO"}
 
     filter_glob: StringProperty(
         default="*.ttf;*.otf;*.TTF;*.OTF",
         options={"HIDDEN"},
         maxlen=255,
+    )
+
+    design_num: bpy.props.IntProperty(
+        name="Design Number",
+        description="Which design slot to load font for (1 or 2)",
+        default=1,
+        min=1,
+        max=2,
     )
 
     @classmethod
@@ -643,93 +664,14 @@ class OBJECT_OT_nfc_load_font_design1(Operator, ImportHelper):
         return OBJECT_NAME in bpy.data.objects
 
     def execute(self, context) -> Set[str]:
-        """Load the font and apply it to the Design 1 text node."""
+        """Load the font and apply it to the specified design's text node."""
         try:
             # Store the font path in properties
-            context.scene.nfc_card_props.font_path_1 = self.filepath
-
-            # Get the card object
-            card_obj = bpy.data.objects.get(OBJECT_NAME)
-            if not card_obj:
-                self.report({"ERROR"}, f"Card object '{OBJECT_NAME}' not found")
-                return {"CANCELLED"}
-
-            # Find the Logo Placer modifier
-            logo_placer_mod = card_obj.modifiers.get("Logo Placer")
-            if not logo_placer_mod or not hasattr(logo_placer_mod, "node_group"):
-                self.report({"ERROR"}, "Logo Placer modifier not found")
-                return {"CANCELLED"}
-
-            # Navigate to the Design Placement.001 node group within Logo Placer
-            logo_placer_tree = logo_placer_mod.node_group
-            design_placement_node = None
-            for node in logo_placer_tree.nodes:
-                if node.type == 'GROUP' and node.name == "Design 1 Input Values":
-                    design_placement_node = node
-                    break
-
-            if not design_placement_node or not design_placement_node.node_tree:
-                self.report({"ERROR"}, "Design 1 Input Values node group not found")
-                return {"CANCELLED"}
-
-            # Find the String to Curves node
-            design_placement_tree = design_placement_node.node_tree
-            string_to_curves = None
-            for node in design_placement_tree.nodes:
-                if node.type == 'STRING_TO_CURVES':
-                    string_to_curves = node
-                    break
-
-            if not string_to_curves:
-                self.report({"ERROR"}, "String to Curves node not found in Design 1")
-                return {"CANCELLED"}
-
-            # Load the font as a VectorFont data block
-            if self.filepath not in bpy.data.fonts:
-                font = bpy.data.fonts.load(self.filepath)
-            else:
-                font = bpy.data.fonts[self.filepath]
-
-            # Apply the font to the String to Curves node (it's a node property, not a socket)
-            string_to_curves.font = font
-
-            self.report(
-                {"INFO"},
-                f"Font loaded for Design 1: {os.path.basename(self.filepath)}",
+            setattr(
+                context.scene.nfc_card_props,
+                f"font_path_{self.design_num}",
+                self.filepath,
             )
-            return {"FINISHED"}
-
-        except Exception as e:
-            self.report({"ERROR"}, f"Failed to load font: {str(e)}")
-            return {"CANCELLED"}
-
-
-class OBJECT_OT_nfc_load_font_design2(Operator, ImportHelper):
-    """Load a custom font for Design 2 text"""
-
-    bl_idname = "object.nfc_load_font_design2"
-    bl_label = "Load Font"
-    bl_description = "Load a custom TrueType or OpenType font for Design 2 text"
-    bl_options = {"REGISTER", "UNDO"}
-
-    filter_glob: StringProperty(
-        default="*.ttf;*.otf;*.TTF;*.OTF",
-        options={"HIDDEN"},
-        maxlen=255,
-    )
-
-    @classmethod
-    def poll(cls, context) -> bool:
-        """Only allow if scene is set up and Card object exists."""
-        if not context.scene.nfc_card_props.scene_setup:
-            return False
-        return OBJECT_NAME in bpy.data.objects
-
-    def execute(self, context) -> Set[str]:
-        """Load the font and apply it to the Design 2 text node."""
-        try:
-            # Store the font path in properties
-            context.scene.nfc_card_props.font_path_2 = self.filepath
 
             # Get the card object
             card_obj = bpy.data.objects.get(OBJECT_NAME)
@@ -743,16 +685,17 @@ class OBJECT_OT_nfc_load_font_design2(Operator, ImportHelper):
                 self.report({"ERROR"}, "Logo Placer modifier not found")
                 return {"CANCELLED"}
 
-            # Navigate to the Design Placement.001 node group within Logo Placer
+            # Navigate to the design's input node group within Logo Placer
+            node_name = f"Design {self.design_num} Input Values"
             logo_placer_tree = logo_placer_mod.node_group
             design_placement_node = None
             for node in logo_placer_tree.nodes:
-                if node.type == 'GROUP' and node.name == "Design 2 Input Values":
+                if node.type == 'GROUP' and node.name == node_name:
                     design_placement_node = node
                     break
 
             if not design_placement_node or not design_placement_node.node_tree:
-                self.report({"ERROR"}, "Design 2 Input Values node group not found")
+                self.report({"ERROR"}, f"{node_name} node group not found")
                 return {"CANCELLED"}
 
             # Find the String to Curves node
@@ -764,7 +707,10 @@ class OBJECT_OT_nfc_load_font_design2(Operator, ImportHelper):
                     break
 
             if not string_to_curves:
-                self.report({"ERROR"}, "String to Curves node not found in Design 2")
+                self.report(
+                    {"ERROR"},
+                    f"String to Curves node not found in Design {self.design_num}",
+                )
                 return {"CANCELLED"}
 
             # Load the font as a VectorFont data block
@@ -773,12 +719,12 @@ class OBJECT_OT_nfc_load_font_design2(Operator, ImportHelper):
             else:
                 font = bpy.data.fonts[self.filepath]
 
-            # Apply the font to the String to Curves node (it's a node property, not a socket)
+            # Apply the font to the String to Curves node
             string_to_curves.font = font
 
             self.report(
                 {"INFO"},
-                f"Font loaded for Design 2: {os.path.basename(self.filepath)}",
+                f"Font loaded for Design {self.design_num}: {os.path.basename(self.filepath)}",
             )
             return {"FINISHED"}
 
@@ -795,8 +741,7 @@ CLASSES = (
     OBJECT_OT_nfc_set_cavity_shape,
     OBJECT_OT_nfc_set_view,
     OBJECT_OT_nfc_export_stl,
-    OBJECT_OT_nfc_load_font_design1,
-    OBJECT_OT_nfc_load_font_design2,
+    OBJECT_OT_nfc_load_font,
 )
 
 
