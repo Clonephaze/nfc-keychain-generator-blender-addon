@@ -12,6 +12,14 @@ import bmesh
 import bpy
 from bpy.types import Operator
 from mathutils import Matrix
+from mathutils.bvhtree import BVHTree
+
+# Constants for mesh processing
+EXTRUDE_HEIGHT = 0.6          # mm – thickness of SVG extrusion
+DISSOLVE_ANGLE = 0.084726646  # ~5 degrees in radians
+MAX_DESIGN_SIZE = 40.0        # mm – designs are scaled to fit within this
+MERGE_DISTANCE = 0.0001       # distance threshold for remove_doubles
+MAX_MESH_VERTS = 500_000      # safety limit for imported SVG vertex count
 
 
 def _process_mesh_geometry(design_obj):
@@ -32,25 +40,24 @@ def _process_mesh_geometry(design_obj):
     bm = bmesh.new()
     bm.from_mesh(mesh)
     faces = bm.faces[:]
-    ANGLE = 0.084726646  # ~5 degrees in radians
 
-    # Extrude faces upwards by 0.6mm
+    # Extrude faces upwards
     extruded_faces = bmesh.ops.extrude_face_region(bm, geom=faces)
     bmesh.ops.transform(
         bm,
-        matrix=Matrix.Translation((0, 0, 0.6)),
+        matrix=Matrix.Translation((0, 0, EXTRUDE_HEIGHT)),
         verts=[v for v in extruded_faces["geom"] if isinstance(v, bmesh.types.BMVert)],
     )
 
     # Limited dissolve and merge by distance
     bmesh.ops.dissolve_limit(
         bm,
-        angle_limit=ANGLE,
+        angle_limit=DISSOLVE_ANGLE,
         verts=bm.verts,
         edges=bm.edges,
         delimit={"NORMAL"},
     )
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0001)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=MERGE_DISTANCE)
 
     # Select and delete interior faces
     interior_faces = _select_interior_faces(bm)
@@ -60,7 +67,7 @@ def _process_mesh_geometry(design_obj):
     # Second dissolve limited and recalculate normals
     bmesh.ops.dissolve_limit(
         bm,
-        angle_limit=ANGLE,
+        angle_limit=DISSOLVE_ANGLE,
         use_dissolve_boundaries=False,
         verts=bm.verts,
         edges=bm.edges,
@@ -228,43 +235,95 @@ def _batch_convert_curves_to_meshes(curve_objects: list) -> list:
     return new_mesh_objects
 
 
-def _select_interior_faces(bm) -> dict:
+def _get_combined_max_dimension(mesh_objects: list) -> float:
+    """Return the largest XY span across all mesh objects.
+
+    Assumes world transforms have already been baked into mesh data
+    (all objects at identity transform).
     """
-    Select interior faces in a BMesh using a two-pass method:
-        1. Identify candidate faces where all edges have more than 2 face users.
-        2. Verify candidates with raycasts to ensure they're truly interior, if the ray
-        hits another face along the normal direction whose normal is roughly opposite.
+    min_x = min_y = float("inf")
+    max_x = max_y = float("-inf")
+    for obj in mesh_objects:
+        for v in obj.data.vertices:
+            min_x = min(min_x, v.co.x)
+            max_x = max(max_x, v.co.x)
+            min_y = min(min_y, v.co.y)
+            max_y = max(max_y, v.co.y)
+    return max(max_x - min_x, max_y - min_y) if mesh_objects else 0.0
+
+
+def _boolean_self_union(obj) -> bool:
+    """Merge overlapping shells inside *obj* into one clean outer shell.
+
+    Uses Blender's Exact boolean solver with ``use_self`` to union all
+    overlapping volumes without needing a second operand object.
+
+    Returns True if the modifier was applied successfully.
+    """
+    mod = obj.modifiers.new("_SelfUnion", "BOOLEAN")
+    mod.operation = "UNION"
+    mod.solver = "EXACT"
+    mod.use_self = True
+
+    try:
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        obj_eval = obj.evaluated_get(depsgraph)
+        new_mesh = bpy.data.meshes.new_from_object(obj_eval)
+    except Exception:
+        obj.modifiers.remove(mod)
+        return False
+
+    old_mesh = obj.data
+    obj.data = new_mesh
+    bpy.data.meshes.remove(old_mesh)
+    obj.modifiers.clear()
+    return True
+
+
+def _select_interior_faces(bm) -> list:
+    """
+    Select interior faces using BVH-tree raycasting.
+
+    A face is considered interior when:
+        1. All its edges border more than 2 faces (structural candidate).
+        2. A ray cast along its outward normal hits another face whose
+           normal is roughly opposing, confirming the face is sandwiched
+           inside the mesh.
+
+    Uses ``BVHTree`` for O(n log m) performance instead of brute-force
+    O(n × m) centre-to-centre checks.
+
     Args:
         bm: The BMesh to operate on
     Returns:
-        A dictionary with selected interior faces
+        A list of interior faces to delete
     """
     candidate_faces = [
         f for f in bm.faces if f.edges and all(len(e.link_faces) > 2 for e in f.edges)
     ]
+    if not candidate_faces:
+        return []
+
+    bm.faces.ensure_lookup_table()
+    bm.verts.ensure_lookup_table()
+    bvh = BVHTree.FromBMesh(bm, epsilon=0.0)
 
     interior_faces = []
-    bm.faces.ensure_lookup_table()
+    OFFSET = 0.0001  # slight offset to avoid self-intersection
 
     for face in candidate_faces:
-        ray_origin = face.calc_center_median()
-        ray_direction = face.normal
+        origin = face.calc_center_median()
+        normal = face.normal.normalized()
 
-        # Check if ray hits another face
-        hit = False
-        for other_face in bm.faces:
-            if other_face == face:
-                continue
-            # If we can reach the back of another face along the normal, this face is interior
-            result = other_face.calc_center_median() - ray_origin
-            if result.dot(ray_direction) > 0.001:  # Small epsilon for floating point
-                # Check if the other face's normal is roughly opposite
-                if other_face.normal.dot(ray_direction) < -0.5:
-                    hit = True
-                    break
+        # Cast along outward normal from just above the face surface
+        hit_loc, hit_normal, _hit_idx, _hit_dist = bvh.ray_cast(
+            origin + normal * OFFSET, normal,
+        )
 
-        if hit:
-            interior_faces.append(face)
+        if hit_loc is not None and hit_normal is not None:
+            # Hit face has opposing normal → this face is interior
+            if hit_normal.dot(normal) < -0.1:
+                interior_faces.append(face)
 
     return interior_faces
 
@@ -411,23 +470,65 @@ def process_svg_to_mesh(filepath: str, design_num: int, report_func=None) -> boo
         if not mesh_objects:
             return False
 
-        # Join all mesh objects into one using BMesh
-        design_obj = _join_mesh_objects_bmesh(mesh_objects)
+        # Bake world transforms into mesh data so all paths share one
+        # coordinate space before we scale and extrude them.
+        for obj in mesh_objects:
+            obj.data.transform(obj.matrix_world)
+            obj.matrix_world = Matrix.Identity(4)
+
+        # Safety guard: reject excessively complex SVGs
+        total_verts = sum(len(obj.data.vertices) for obj in mesh_objects)
+        if total_verts > MAX_MESH_VERTS:
+            if report_func:
+                report_func(
+                    {"WARNING"},
+                    f"SVG is too complex ({total_verts:,} vertices, max {MAX_MESH_VERTS:,}). "
+                    "Simplify the SVG or use a less detailed design.",
+                )
+            for obj in mesh_objects:
+                bpy.data.objects.remove(obj, do_unlink=True)
+            return False
+
+        # Uniform scale based on combined bounding box
+        max_dim = _get_combined_max_dimension(mesh_objects)
+        if max_dim > 0:
+            scale_factor = MAX_DESIGN_SIZE / max_dim
+            for obj in mesh_objects:
+                obj.scale = (scale_factor, scale_factor, scale_factor)
+                _apply_scale_to_mesh(obj)
+
+        # ---- KEY FIX: process each path independently ----
+        # Extruding each path as its own closed shell prevents
+        # overlapping paths from sharing edges (which would be non-manifold).
+        valid_meshes = []
+        for obj in mesh_objects:
+            if len(obj.data.polygons) == 0:
+                bpy.data.objects.remove(obj, do_unlink=True)
+                continue
+            _process_mesh_geometry(obj)
+            if len(obj.data.polygons) > 0:
+                valid_meshes.append(obj)
+            else:
+                bpy.data.objects.remove(obj, do_unlink=True)
+
+        if not valid_meshes:
+            if report_func:
+                report_func(
+                    {"ERROR"},
+                    "No valid geometry after processing SVG paths.",
+                )
+            return False
+
+        # Join all independently-extruded shells into one object
+        design_obj = _join_mesh_objects_bmesh(valid_meshes)
         if not design_obj:
             return False
 
         design_obj.name = f"Design_{design_num}_SVG"
 
-        # Calculate scale to fit within 40mm
-        dimensions = design_obj.dimensions
-        max_dim = max(dimensions.x, dimensions.y)
-        if max_dim > 0:
-            scale_factor = 40.0 / max_dim
-            design_obj.scale = (scale_factor, scale_factor, scale_factor)
-
-        _apply_scale_to_mesh(design_obj)
-
-        _process_mesh_geometry(design_obj)
+        # Merge overlapping shells into one clean surface so the
+        # boolean-difference in geometry nodes gets a proper input.
+        _boolean_self_union(design_obj)
 
         _set_origin_to_center_of_mass(design_obj)
 
@@ -446,15 +547,21 @@ def process_svg_to_mesh(filepath: str, design_num: int, report_func=None) -> boo
 
         logo_placer_node_group = _find_logo_placer_node_group()
         if not logo_placer_node_group:
+            if report_func:
+                report_func({"ERROR"}, "Logo Placer node group not found. Ensure the scene is set up.")
             return False
 
         design_input_node = _find_design_input_node(logo_placer_node_group, design_num)
         if not design_input_node:
+            if report_func:
+                report_func({"ERROR"}, f"Design {design_num} input node not found in Logo Placer.")
             return False
 
         try:
             design_input_node.inputs[0].default_value = design_obj
-        except Exception:
+        except Exception as e:
+            if report_func:
+                report_func({"ERROR"}, f"Failed to assign design to node: {e}")
             return False
 
         design_obj.hide_viewport = True

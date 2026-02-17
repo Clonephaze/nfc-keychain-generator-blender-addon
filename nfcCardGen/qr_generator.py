@@ -8,14 +8,14 @@ This module handles generating different types of QR codes using the segno libra
 - Email QR codes for pre-filled email messages
 """
 
-import os
+import math
 import traceback
 from typing import Optional
 
 import bmesh
 import bpy
-import numpy as np
-from bpy.types import Material, Object, Operator
+from bpy.types import Object, Operator
+from mathutils import Matrix
 
 try:
     import segno
@@ -32,49 +32,6 @@ except Exception as e:
     helpers = None
 
 
-def _get_temp_svg_path(design_num: int) -> str:
-    """
-    Get a temporary SVG file path for QR code processing.
-
-    Uses the extension's user directory with a unique filename to ensure proper permissions
-    and automatic cleanup. Files are intended to be deleted immediately after use.
-
-    Args:
-        design_num: Which design slot this is for (1 or 2)
-
-    Returns:
-        Full path to the temporary SVG file
-    """
-    import time
-    import random
-
-    temp_dir = bpy.utils.extension_path_user(__package__, path="temp", create=True)
-    # Create unique filename with timestamp and random component to avoid conflicts
-    timestamp = int(time.time() * 1000)  # milliseconds
-    random_id = random.randint(1000, 9999)
-    filename = f"qr_design_{design_num}_{timestamp}_{random_id}.svg"
-    return os.path.join(temp_dir, filename)
-
-
-def _cleanup_old_temp_files() -> None:
-    """
-    Clean up any old temporary SVG files that may have been left behind.
-
-    This is called during addon initialization to ensure no accumulation
-    of temporary files over time.
-    """
-    try:
-        temp_dir = bpy.utils.extension_path_user(__package__, path="temp", create=False)
-        if os.path.exists(temp_dir):
-            for filename in os.listdir(temp_dir):
-                if filename.startswith("qr_design_") and filename.endswith(".svg"):
-                    file_path = os.path.join(temp_dir, filename)
-                    try:
-                        os.unlink(file_path)
-                    except Exception:
-                        pass  # Ignore errors when cleaning up
-    except Exception:
-        pass  # Ignore errors if temp directory doesn't exist or can't be accessed
 
 
 class QRCodeGenerator:
@@ -121,6 +78,11 @@ class QRCodeGenerator:
             return None
 
         try:
+            # Validate content length to prevent impractically large QR codes
+            if len(content) > 2000:
+                print(f"QR content too long ({len(content)} chars, max 2000).")
+                return None
+
             # Create standard QR code - segno automatically optimizes encoding
             qr = segno.make_qr(content, error=error_correction)
             return qr
@@ -312,185 +274,6 @@ class QRCodeGenerator:
             print(f"Unknown QR code type: {qr_type}")
             return None
 
-    @classmethod
-    def create_qr_mesh_from_data(
-        cls, qr_data: segno.QRCode, size: float = 0.02
-    ) -> Optional[Object]:
-        """
-        Convert QR code data into a 3D mesh object.
-
-        This creates a mesh where each QR code module (pixel) becomes a small cube.
-
-        Args:
-            qr_data: QR code data from segno.
-            size: Size of the QR code in Blender units.
-
-        Returns:
-            Created mesh object, or None if conversion failed.
-        """
-        if not qr_data:
-            return None
-
-        matrix = [list(row) for row in qr_data.matrix]
-        qr_size = len(matrix)
-        module_size = size / qr_size
-
-        mesh = bpy.data.meshes.new("QR_Code")
-        qr_object = bpy.data.objects.new("QR_Code", mesh)
-        bpy.context.collection.objects.link(qr_object)
-
-        bm = bmesh.new()
-
-        try:
-            for row_idx, row in enumerate(matrix):
-                for col_idx, is_dark in enumerate(row):
-                    if is_dark:
-                        x = (col_idx - qr_size / 2) * module_size
-                        y = (row_idx - qr_size / 2) * module_size
-                        z = 0
-
-                        # 0.9 scale creates small gaps between modules for better definition
-                        bmesh.ops.create_cube(
-                            bm,
-                            size=module_size * 0.9,
-                            matrix=bpy.utils.Matrix.Translation((x, y, z)),
-                        )
-
-            bm.to_mesh(mesh)
-            mesh.update()
-
-            return qr_object
-
-        except Exception as e:
-            print(f"QR mesh creation failed: {e}")
-            return None
-
-        finally:
-            bm.free()
-
-    @staticmethod
-    def create_qr_material(name: str = "QR_Code_Material") -> Material:
-        """
-        Create a material suitable for QR codes.
-
-        Args:
-            name: Name for the created material.
-
-        Returns:
-            The created material.
-        """
-        material = bpy.data.materials.new(name=name)
-        material.use_nodes = True
-
-        nodes = material.node_tree.nodes
-        nodes.clear()
-
-        bsdf = nodes.new(type="ShaderNodeBsdfPrincipled")
-        output = nodes.new(type="ShaderNodeOutputMaterial")
-
-        # Dark, matte material ensures good contrast and scannability
-        bsdf.inputs["Base Color"].default_value = (0.05, 0.05, 0.05, 1.0)
-        bsdf.inputs["Metallic"].default_value = 0.0
-        bsdf.inputs["Roughness"].default_value = 0.9
-
-        material.node_tree.links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
-
-        bsdf.location = (0, 0)
-        output.location = (200, 0)
-
-        return material
-
-    @classmethod
-    def prepare_qr_for_card(cls, qr_object: Object, target_size: float = 0.025) -> None:
-        """
-        Prepare QR code object for card placement by scaling it appropriately.
-
-        Positioning is handled by the geometry node system.
-
-        Args:
-            qr_object: The QR code mesh object.
-            target_size: Target size for the QR code in meters (default 25mm).
-        """
-        if not qr_object:
-            return
-
-        bbox_corners = [
-            qr_object.matrix_world @ vertex.co for vertex in qr_object.bound_box
-        ]
-        current_size = max(
-            max(corner.x for corner in bbox_corners)
-            - min(corner.x for corner in bbox_corners),
-            max(corner.y for corner in bbox_corners)
-            - min(corner.y for corner in bbox_corners),
-        )
-
-        if current_size > 0:
-            scale_factor = target_size / current_size
-            qr_object.scale = (scale_factor, scale_factor, scale_factor)
-
-        qr_object.location = (0, 0, 0)
-        qr_object.name = "QR_Code"
-
-
-def generate_qr_for_card(qr_type: str, **qr_params) -> Optional[Object]:
-    """
-    Convenience function to generate any type of QR code for card placement.
-
-    Args:
-        qr_type: Type of QR code ('TEXT', 'WIFI', 'CONTACT', 'EMAIL').
-        **qr_params: Type-specific parameters for QR generation.
-
-    Returns:
-        Created QR code object, or None if generation failed.
-    """
-    if not QRCodeGenerator.is_segno_available():
-        print("Segno library not available for QR code generation")
-        return None
-
-    qr_data = QRCodeGenerator.generate_qr_by_type(qr_type, **qr_params)
-    if not qr_data:
-        print(f"Failed to generate {qr_type} QR code")
-        return None
-
-    qr_object = QRCodeGenerator.create_qr_mesh_from_data(qr_data, size=0.02)
-    if not qr_object:
-        print("Failed to create QR code mesh")
-        return None
-
-    QRCodeGenerator.prepare_qr_for_card(qr_object)
-    qr_object.name = f"QR_Code_{qr_type}"
-
-    return qr_object
-
-
-def generate_text_qr_for_card(content: str) -> Optional[Object]:
-    """Generate a text/URL QR code for card placement."""
-    return generate_qr_for_card(QRCodeGenerator.QR_TYPE_TEXT, content=content)
-
-
-def generate_wifi_qr_for_card(
-    ssid: str, password: str = "", security: str = "WPA"
-) -> Optional[Object]:
-    """Generate a WiFi QR code for card placement."""
-    return generate_qr_for_card(
-        QRCodeGenerator.QR_TYPE_WIFI, ssid=ssid, password=password, security=security
-    )
-
-
-def generate_contact_qr_for_card(
-    name: str, phone: str = "", email: str = "", url: str = "", org: str = ""
-) -> Optional[Object]:
-    """Generate a contact vCard QR code for card placement."""
-    return generate_qr_for_card(
-        QRCodeGenerator.QR_TYPE_CONTACT,
-        name=name,
-        phone=phone,
-        email=email,
-        url=url,
-        org=org,
-    )
-
-
 class OBJECT_OT_nfc_toggle_qr_mode(Operator):
     """Toggle QR code generation mode for a design slot"""
 
@@ -523,12 +306,14 @@ class OBJECT_OT_nfc_toggle_qr_mode(Operator):
         props = context.scene.nfc_card_props
 
         if self.design_num == 1:
+            was_qr = props.qr_mode_1
             props.qr_mode_1 = self.enable_qr
-            if props.qr_mode_1 != self.enable_qr:
+            if was_qr != self.enable_qr:
                 props.has_design_1 = False
         else:
+            was_qr = props.qr_mode_2
             props.qr_mode_2 = self.enable_qr
-            if props.qr_mode_2 != self.enable_qr:
+            if was_qr != self.enable_qr:
                 props.has_design_2 = False
 
         return {"FINISHED"}
@@ -545,9 +330,251 @@ ROUNDED_CORNER_RADIUS = (
     0.3  # Corner radius for rounded adaptive style (fraction of module size)
 )
 
+# Direct BMesh QR construction constants
+CIRCLE_SEGMENTS = 32       # polygon segments for circle approximation
+BEZIER_SAMPLES = 8         # samples per cubic-Bézier quarter-arc (32 verts/squircle)
+CORNER_ARC_SAMPLES = 6     # samples per quadratic-Bézier rounded corner
+QR_EXTRUDE_HEIGHT = 0.6    # mm – extrusion thickness for QR modules
+QR_TARGET_SIZE = 40.0      # mm – final QR mesh scaled to fit this dimension
+ROUNDED_MERGE_DIST = 0.0001  # vertex merge distance for ROUNDED blob welding
+
+
+# ---------------------------------------------------------------------------
+#  Geometry helpers – polygon vertex generators & BMesh extrusion utilities
+# ---------------------------------------------------------------------------
+
+def _cubic_bezier(p0, p1, p2, p3, t):
+    """Evaluate cubic Bézier at parameter *t* ∈ [0, 1]."""
+    u = 1.0 - t
+    return (
+        u*u*u*p0[0] + 3*u*u*t*p1[0] + 3*u*t*t*p2[0] + t*t*t*p3[0],
+        u*u*u*p0[1] + 3*u*u*t*p1[1] + 3*u*t*t*p2[1] + t*t*t*p3[1],
+    )
+
+
+def _quadratic_bezier(p0, p1, p2, t):
+    """Evaluate quadratic Bézier at parameter *t* ∈ [0, 1]."""
+    u = 1.0 - t
+    return (
+        u*u*p0[0] + 2*u*t*p1[0] + t*t*p2[0],
+        u*u*p0[1] + 2*u*t*p1[1] + t*t*p2[1],
+    )
+
+
+def _square_verts(
+    cx: float, cy: float, half: float,
+) -> list[tuple[float, float]]:
+    """CCW square vertices centred at (*cx*, *cy*)."""
+    return [
+        (cx - half, cy - half),
+        (cx + half, cy - half),
+        (cx + half, cy + half),
+        (cx - half, cy + half),
+    ]
+
+
+def _circle_verts(
+    cx: float, cy: float, radius: float,
+    segments: int = CIRCLE_SEGMENTS,
+) -> list[tuple[float, float]]:
+    """CCW regular polygon approximating a circle."""
+    tau = 2.0 * math.pi
+    return [
+        (cx + radius * math.cos(tau * i / segments),
+         cy + radius * math.sin(tau * i / segments))
+        for i in range(segments)
+    ]
+
+
+def _squircle_verts(
+    cx: float, cy: float, size: float,
+    samples: int = BEZIER_SAMPLES,
+) -> list[tuple[float, float]]:
+    """Super-ellipse (squircle) vertices via cubic-Bézier sampling."""
+    half = size / 2.0
+    d = half * SQUIRCLE_MAGIC_K
+    # Four Bézier quarter-arcs starting at top, going clockwise
+    curves = [
+        ((cx, cy - half), (cx + d, cy - half), (cx + half, cy - d), (cx + half, cy)),
+        ((cx + half, cy), (cx + half, cy + d), (cx + d, cy + half), (cx, cy + half)),
+        ((cx, cy + half), (cx - d, cy + half), (cx - half, cy + d), (cx - half, cy)),
+        ((cx - half, cy), (cx - half, cy - d), (cx - d, cy - half), (cx, cy - half)),
+    ]
+    verts: list[tuple[float, float]] = []
+    for p0, p1, p2, p3 in curves:
+        for i in range(samples):
+            verts.append(_cubic_bezier(p0, p1, p2, p3, i / samples))
+    return verts
+
+
+def _rounded_rect_verts(
+    x: float, y: float, size: float, round_corners: dict,
+    r_frac: float = ROUNDED_CORNER_RADIUS,
+    arc_n: int = CORNER_ARC_SAMPLES,
+) -> list[tuple[float, float]]:
+    """Rectangle with selectively rounded corners.
+
+    *x*, *y* is the top-left corner of the bounding square.
+    *round_corners* maps ``'tl'``, ``'tr'``, ``'br'``, ``'bl'`` → bool.
+    """
+    r = size * r_frac
+    verts: list[tuple[float, float]] = []
+
+    # Start at top-left
+    if round_corners.get("tl"):
+        verts.append((x + r, y))
+    else:
+        verts.append((x, y))
+
+    # Top-right corner
+    if round_corners.get("tr"):
+        p0, p1, p2 = (x + size - r, y), (x + size, y), (x + size, y + r)
+        verts.append(p0)
+        for i in range(1, arc_n + 1):
+            verts.append(_quadratic_bezier(p0, p1, p2, i / arc_n))
+    else:
+        verts.append((x + size, y))
+
+    # Bottom-right corner
+    if round_corners.get("br"):
+        p0 = (x + size, y + size - r)
+        p1 = (x + size, y + size)
+        p2 = (x + size - r, y + size)
+        verts.append(p0)
+        for i in range(1, arc_n + 1):
+            verts.append(_quadratic_bezier(p0, p1, p2, i / arc_n))
+    else:
+        verts.append((x + size, y + size))
+
+    # Bottom-left corner
+    if round_corners.get("bl"):
+        p0 = (x + r, y + size)
+        p1 = (x, y + size)
+        p2 = (x, y + size - r)
+        verts.append(p0)
+        for i in range(1, arc_n + 1):
+            verts.append(_quadratic_bezier(p0, p1, p2, i / arc_n))
+    else:
+        verts.append((x, y + size))
+
+    # Top-left corner (closing arc)
+    if round_corners.get("tl"):
+        p0 = (x, y + r)
+        p1 = (x, y)
+        p2 = (x + r, y)
+        verts.append(p0)
+        for i in range(1, arc_n):  # exclude last – coincides with start vertex
+            verts.append(_quadratic_bezier(p0, p1, p2, i / arc_n))
+
+    return verts
+
+
+def _shape_verts_for_style(
+    cx: float, cy: float, size: float, style: str,
+) -> list[tuple[float, float]]:
+    """Return polygon vertices for a shape *style* (no module scale applied)."""
+    half = size / 2.0
+    if style == "SQUARE":
+        return _square_verts(cx, cy, half)
+    if style == "CIRCLE":
+        return _circle_verts(cx, cy, half)
+    if style == "SQUIRCLE":
+        return _squircle_verts(cx, cy, size)
+    return _square_verts(cx, cy, half)  # fallback
+
+
+def _module_verts_for_style(
+    cx: float, cy: float, size: float, style: str,
+    round_corners: dict | None = None,
+) -> list[tuple[float, float]]:
+    """Return polygon vertices for a single QR module with MODULE_SCALE_FACTOR gap."""
+    scaled = size * MODULE_SCALE_FACTOR
+    half_s = scaled / 2.0
+    if style == "SQUARE":
+        return _square_verts(cx, cy, half_s)
+    if style == "CIRCLE":
+        return _circle_verts(cx, cy, half_s)
+    if style == "SQUIRCLE":
+        return _squircle_verts(cx, cy, scaled)
+    if style == "ROUNDED":
+        if round_corners and any(round_corners.values()):
+            return _rounded_rect_verts(
+                cx - half_s, cy - half_s, scaled, round_corners,
+            )
+        return _square_verts(cx, cy, half_s)
+    return _square_verts(cx, cy, half_s)  # fallback
+
+
+def _create_flat_face(
+    bm: bmesh.types.BMesh,
+    verts_2d: list[tuple[float, float]],
+    z: float = 0.0,
+) -> None:
+    """Create a single flat face at height *z* from 2-D polygon vertices."""
+    n = len(verts_2d)
+    if n < 3:
+        return
+    bm.faces.new([bm.verts.new((x, y, z)) for x, y in verts_2d])
+
+
+def _extrude_polygon(
+    bm: bmesh.types.BMesh,
+    verts_2d: list[tuple[float, float]],
+    z_bot: float = 0.0,
+    z_top: float = QR_EXTRUDE_HEIGHT,
+) -> None:
+    """Create a closed extruded solid from a 2-D polygon outline.
+
+    Builds bottom face, top face and side quads – guaranteed manifold when
+    the polygon is non-self-intersecting.
+    """
+    n = len(verts_2d)
+    if n < 3:
+        return
+    bot = [bm.verts.new((x, y, z_bot)) for x, y in verts_2d]
+    top = [bm.verts.new((x, y, z_top)) for x, y in verts_2d]
+    # Bottom face – reversed winding so normal points −Z
+    bm.faces.new(bot[::-1])
+    # Top face – normal points +Z
+    bm.faces.new(top)
+    # Side quads
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new([bot[i], bot[j], top[j], top[i]])
+
+
+def _extrude_ring(
+    bm: bmesh.types.BMesh,
+    outer: list[tuple[float, float]],
+    inner: list[tuple[float, float]],
+    z_bot: float = 0.0,
+    z_top: float = QR_EXTRUDE_HEIGHT,
+) -> None:
+    """Create a closed extruded annular ring (outer shell with inner hole).
+
+    Both polygons must have the **same** vertex count and consistent winding.
+    """
+    n = len(outer)
+    if n < 3 or len(inner) != n:
+        return
+    ob = [bm.verts.new((x, y, z_bot)) for x, y in outer]
+    ot = [bm.verts.new((x, y, z_top)) for x, y in outer]
+    ib = [bm.verts.new((x, y, z_bot)) for x, y in inner]
+    it_ = [bm.verts.new((x, y, z_top)) for x, y in inner]
+    for i in range(n):
+        j = (i + 1) % n
+        # Top annular quad
+        bm.faces.new([ot[i], ot[j], it_[j], it_[i]])
+        # Bottom annular quad (reversed winding)
+        bm.faces.new([ob[j], ob[i], ib[i], ib[j]])
+        # Outer side face
+        bm.faces.new([ob[i], ob[j], ot[j], ot[i]])
+        # Inner side face (inward-pointing normal)
+        bm.faces.new([ib[j], ib[i], it_[i], it_[j]])
+
 
 class OBJECT_OT_nfc_generate_qr(Operator):
-    """Generate a QR code and process it through the SVG pipeline"""
+    """Generate a QR code and build it directly as manifold BMesh geometry"""
 
     bl_idname = "object.nfc_generate_qr"
     bl_label = "Generate QR Code"
@@ -571,46 +598,26 @@ class OBJECT_OT_nfc_generate_qr(Operator):
 
     def _get_qr_settings(self, props, design_num: int):
         """Helper to get QR settings for a design slot."""
-        if design_num == 1:
-            return {
-                "qr_type": props.qr_type_1,
-                "error_correction": props.qr_error_correction_1,
-                "text_content": props.qr_text_content_1,
-                "wifi_ssid": props.qr_wifi_ssid_1,
-                "wifi_password": props.qr_wifi_password_1,
-                "wifi_security": props.qr_wifi_security_1,
-                "wifi_hidden": props.qr_wifi_hidden_1,
-                "contact_name": props.qr_contact_name_1,
-                "contact_phone": props.qr_contact_phone_1,
-                "contact_email": props.qr_contact_email_1,
-                "contact_url": props.qr_contact_url_1,
-                "contact_org": props.qr_contact_org_1,
-                "email_to": props.qr_email_to_1,
-                "email_cc": props.qr_email_cc_1,
-                "email_bcc": props.qr_email_bcc_1,
-                "email_subject": props.qr_email_subject_1,
-                "email_body": props.qr_email_body_1,
-            }
-        else:
-            return {
-                "qr_type": props.qr_type_2,
-                "error_correction": props.qr_error_correction_2,
-                "text_content": props.qr_text_content_2,
-                "wifi_ssid": props.qr_wifi_ssid_2,
-                "wifi_password": props.qr_wifi_password_2,
-                "wifi_security": props.qr_wifi_security_2,
-                "wifi_hidden": props.qr_wifi_hidden_2,
-                "contact_name": props.qr_contact_name_2,
-                "contact_phone": props.qr_contact_phone_2,
-                "contact_email": props.qr_contact_email_2,
-                "contact_url": props.qr_contact_url_2,
-                "contact_org": props.qr_contact_org_2,
-                "email_to": props.qr_email_to_2,
-                "email_cc": props.qr_email_cc_2,
-                "email_bcc": props.qr_email_bcc_2,
-                "email_subject": props.qr_email_subject_2,
-                "email_body": props.qr_email_body_2,
-            }
+        s = str(design_num)
+        return {
+            "qr_type": getattr(props, f"qr_type_{s}"),
+            "error_correction": getattr(props, f"qr_error_correction_{s}"),
+            "text_content": getattr(props, f"qr_text_content_{s}"),
+            "wifi_ssid": getattr(props, f"qr_wifi_ssid_{s}"),
+            "wifi_password": getattr(props, f"qr_wifi_password_{s}"),
+            "wifi_security": getattr(props, f"qr_wifi_security_{s}"),
+            "wifi_hidden": getattr(props, f"qr_wifi_hidden_{s}"),
+            "contact_name": getattr(props, f"qr_contact_name_{s}"),
+            "contact_phone": getattr(props, f"qr_contact_phone_{s}"),
+            "contact_email": getattr(props, f"qr_contact_email_{s}"),
+            "contact_url": getattr(props, f"qr_contact_url_{s}"),
+            "contact_org": getattr(props, f"qr_contact_org_{s}"),
+            "email_to": getattr(props, f"qr_email_to_{s}"),
+            "email_cc": getattr(props, f"qr_email_cc_{s}"),
+            "email_bcc": getattr(props, f"qr_email_bcc_{s}"),
+            "email_subject": getattr(props, f"qr_email_subject_{s}"),
+            "email_body": getattr(props, f"qr_email_body_{s}"),
+        }
 
     def _build_qr_params(self, qr_type: str, settings: dict):
         """Helper to build QR parameters based on type."""
@@ -666,7 +673,7 @@ class OBJECT_OT_nfc_generate_qr(Operator):
         return qr_params, None
 
     def execute(self, context):
-        """Generate QR code and process it."""
+        """Generate QR code, build it as direct BMesh geometry, and connect to nodes."""
         props = context.scene.nfc_card_props
 
         settings = self._get_qr_settings(props, self.design_num)
@@ -683,36 +690,54 @@ class OBJECT_OT_nfc_generate_qr(Operator):
             return {"CANCELLED"}
 
         try:
-            # Get extension-specific temp file path for SVG processing
-            temp_svg_path = _get_temp_svg_path(self.design_num)
-
             matrix = [list(row) for row in qr_code.matrix]
-            svg_content = self._create_qr_svg(matrix, len(matrix), 1.0)
+            qr_size = len(matrix)
 
-            with open(temp_svg_path, "w") as f:
-                f.write(svg_content)
-
-            from . import svg_import
-
-            success = svg_import.process_svg_to_mesh(
-                temp_svg_path, self.design_num, self.report
-            )
-
-            if success:
-                if self.design_num == 1:
-                    props.has_design_1 = True
-                else:
-                    props.has_design_2 = True
+            # Read style settings for this design slot
+            if self.design_num == 1:
+                module_style = props.qr_module_style_1
+                finder_style = props.qr_finder_style_1
             else:
-                self.report({"ERROR"}, "Failed to process QR code SVG")
+                module_style = props.qr_module_style_2
+                finder_style = props.qr_finder_style_2
+
+            finder_border_style = self._determine_border_style(finder_style)
+
+            # Build mesh directly via BMesh – no SVG intermediary
+            design_obj = self._build_qr_mesh(
+                matrix, qr_size, module_style, finder_style, finder_border_style,
+            )
+            if not design_obj:
+                self.report({"ERROR"}, "Failed to build QR code mesh")
                 return {"CANCELLED"}
 
-            # Clean up temporary SVG file
-            try:
-                if os.path.exists(temp_svg_path):
-                    os.unlink(temp_svg_path)
-            except Exception:
-                pass
+            # Connect to geometry-node setup
+            from . import svg_import
+
+            logo_placer = svg_import._find_logo_placer_node_group()
+            if not logo_placer:
+                bpy.data.objects.remove(design_obj, do_unlink=True)
+                self.report(
+                    {"ERROR"},
+                    "Logo Placer node group not found. Ensure the scene is set up.",
+                )
+                return {"CANCELLED"}
+
+            design_input = svg_import._find_design_input_node(
+                logo_placer, self.design_num,
+            )
+            if not design_input:
+                bpy.data.objects.remove(design_obj, do_unlink=True)
+                self.report({"ERROR"}, "Design input node not found.")
+                return {"CANCELLED"}
+
+            design_input.inputs[0].default_value = design_obj
+            design_obj.hide_viewport = True
+
+            if self.design_num == 1:
+                props.has_design_1 = True
+            else:
+                props.has_design_2 = True
 
         except Exception as e:
             traceback.print_exc()
@@ -721,254 +746,179 @@ class OBJECT_OT_nfc_generate_qr(Operator):
 
         return {"FINISHED"}
 
-    def _create_qr_svg(self, matrix, qr_size: int, module_size: float) -> str:
-        """Create SVG content from QR matrix with custom styling."""
-        props = bpy.context.scene.nfc_card_props
+    # ------------------------------------------------------------------
+    #  Direct BMesh QR mesh construction
+    # ------------------------------------------------------------------
 
-        if self.design_num == 1:
-            module_style = props.qr_module_style_1
-            finder_style = props.qr_finder_style_1
-        else:
-            module_style = props.qr_module_style_2
-            finder_style = props.qr_finder_style_2
+    def _build_qr_mesh(
+        self, matrix, qr_size: int,
+        module_style: str, finder_style: str, finder_border_style: str,
+    ) -> Optional[Object]:
+        """Build the full QR code as a manifold mesh directly in BMesh.
 
-        finder_border_style = self._determine_border_style(finder_style)
-        svg_width = qr_size * module_size
-        svg_height = qr_size * module_size
+        For SQUARE / CIRCLE / SQUIRCLE each module is independently extruded
+        with a MODULE_SCALE_FACTOR gap – guaranteed manifold by construction.
+
+        For ROUNDED the modules are placed at full size so adjacent dark
+        cells merge into continuous blobs with only the exposed corners
+        rounded.  The flat faces are welded, extruded as one, then cleaned.
+        """
+        module_size = QR_TARGET_SIZE / qr_size
         finder_positions = self._get_finder_positions(qr_size)
 
-        # Pre-analyze neighbors for rounded style (batch operation)
-        corner_map = {}
-        if module_style == "ROUNDED":
-            corner_map = self._analyze_neighbors(matrix)
+        mesh = bpy.data.meshes.new(f"QR_Design_{self.design_num}")
+        obj = bpy.data.objects.new(f"Design_{self.design_num}_QR", mesh)
+        bpy.context.collection.objects.link(obj)
 
-        svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="{svg_height}" viewBox="0 0 {svg_width} {svg_height}">
-'''
+        bm = bmesh.new()
+        try:
+            if module_style == "ROUNDED":
+                self._build_rounded_blobs(
+                    bm, matrix, qr_size, module_size, finder_positions,
+                )
+            else:
+                # --- per-module extrusion (SQUARE / CIRCLE / SQUIRCLE) ---
+                for row_idx, row in enumerate(matrix):
+                    for col_idx, is_dark in enumerate(row):
+                        if not is_dark:
+                            continue
+                        if self._is_in_finder_area(
+                            row_idx, col_idx, finder_positions,
+                        ):
+                            continue
+                        cx = (col_idx - qr_size / 2 + 0.5) * module_size
+                        cy = (row_idx - qr_size / 2 + 0.5) * module_size
+                        verts = _module_verts_for_style(
+                            cx, cy, module_size, module_style, None,
+                        )
+                        _extrude_polygon(bm, verts)
 
-        for finder_pos in finder_positions:
-            svg_content += self._create_finder_pattern(
-                finder_pos, module_size, finder_style, finder_border_style
+            # --- finder patterns (border ring + centre fill) ---
+            for fp in finder_positions:
+                self._build_finder_bmesh(
+                    bm, fp, module_size, qr_size,
+                    finder_style, finder_border_style,
+                )
+
+            # Centre origin in Z so the mesh spans −height/2 … +height/2
+            z_offset = -QR_EXTRUDE_HEIGHT / 2.0
+            bmesh.ops.transform(
+                bm,
+                matrix=Matrix.Translation((0, 0, z_offset)),
+                verts=bm.verts,
             )
 
+            # Ensure consistent outward normals
+            bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+            bm.to_mesh(mesh)
+            mesh.update()
+
+        except Exception:
+            bpy.data.objects.remove(obj, do_unlink=True)
+            raise
+        finally:
+            bm.free()
+
+        return obj
+
+    def _build_rounded_blobs(
+        self, bm, matrix, qr_size: int, module_size: float,
+        finder_positions: list,
+    ) -> None:
+        """Build ROUNDED-style data modules as continuous merged blobs.
+
+        1. Place each dark module as a **full-size** rounded-rect flat face
+           (corners without cardinal neighbours are rounded, others are sharp).
+        2. Weld coincident vertices so adjacent modules share edges.
+        3. Extrude the connected flat mesh upward.
+        4. Clean up interior faces and recalculate normals.
+        """
+        corner_map = self._analyze_neighbors(matrix)
+        half = module_size / 2.0
+
+        # --- lay down flat faces at z = 0 ---------------------------------
         for row_idx, row in enumerate(matrix):
             for col_idx, is_dark in enumerate(row):
-                if is_dark and not self._is_in_finder_area(
-                    row_idx, col_idx, finder_positions
-                ):
-                    x = col_idx * module_size
-                    y = row_idx * module_size
+                if not is_dark:
+                    continue
+                if self._is_in_finder_area(row_idx, col_idx, finder_positions):
+                    continue
 
-                    # Pass corner info for rounded style
-                    corners = corner_map.get((row_idx, col_idx), None)
-                    svg_content += self._create_shape(
-                        x, y, module_size, module_style, corners
+                cx = (col_idx - qr_size / 2 + 0.5) * module_size
+                cy = (row_idx - qr_size / 2 + 0.5) * module_size
+
+                corners = corner_map.get((row_idx, col_idx))
+                if corners and any(corners.values()):
+                    verts = _rounded_rect_verts(
+                        cx - half, cy - half, module_size, corners,
                     )
+                else:
+                    verts = _square_verts(cx, cy, half)
+                _create_flat_face(bm, verts)
 
-        svg_content += "</svg>"
-        return svg_content
+        # --- merge shared edges between adjacent modules ------------------
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=ROUNDED_MERGE_DIST)
 
-    def _determine_border_style(self, finder_style: str) -> str:
-        """Determine border style based on finder center style."""
-        if finder_style in ("SQUARE", "CIRCLE"):
-            return finder_style
-        return "SQUIRCLE"
-
-    def _get_finder_positions(self, qr_size: int) -> list:
-        """Get positions of the three finder patterns."""
-        offset = FINDER_PATTERN_SIZE // 2
-        return [
-            {"row": offset, "col": offset},
-            {"row": offset, "col": qr_size - offset - 1},
-            {"row": qr_size - offset - 1, "col": offset},
+        # --- extrude the connected flat faces upward ----------------------
+        faces = bm.faces[:]
+        extruded = bmesh.ops.extrude_face_region(bm, geom=faces)
+        ext_verts = [
+            v for v in extruded["geom"] if isinstance(v, bmesh.types.BMVert)
         ]
-
-    def _is_in_finder_area(self, row: int, col: int, finder_positions: list) -> bool:
-        """Check if a module is within any finder pattern area."""
-        half_size = FINDER_PATTERN_SIZE // 2
-        for finder in finder_positions:
-            if (
-                abs(row - finder["row"]) <= half_size
-                and abs(col - finder["col"]) <= half_size
-            ):
-                return True
-        return False
-
-    def _analyze_neighbors(self, matrix) -> dict:
-        """Analyze QR matrix to determine which corners should be rounded.
-
-        Uses NumPy array slicing for efficient neighbor detection.
-        Returns dict mapping (row, col) to rounded corner flags.
-        """
-        arr = np.array(matrix, dtype=bool)
-        height, width = arr.shape
-        padded = np.pad(arr, pad_width=1, mode="constant", constant_values=False)
-
-        north = padded[:-2, 1:-1]
-        south = padded[2:, 1:-1]
-        west = padded[1:-1, :-2]
-        east = padded[1:-1, 2:]
-
-        corners = {}
-        filled = np.argwhere(arr)
-
-        for row, col in filled:
-            round_corners = {
-                "tl": not north[row, col] and not west[row, col],
-                "tr": not north[row, col] and not east[row, col],
-                "br": not south[row, col] and not east[row, col],
-                "bl": not south[row, col] and not west[row, col],
-            }
-            if any(round_corners.values()):
-                corners[(row, col)] = round_corners
-
-        return corners
-
-    def _create_rounded_rect_path(
-        self, x: float, y: float, size: float, round_corners: dict
-    ) -> str:
-        """Create SVG path for rectangle with adaptive rounded corners."""
-        r = size * ROUNDED_CORNER_RADIUS
-        start_x = x + (r if round_corners["tl"] else 0)
-
-        path = f"M {start_x},{y} "
-
-        if round_corners["tr"]:
-            path += f"L {x + size - r},{y} Q {x + size},{y} {x + size},{y + r} "
-        else:
-            path += f"L {x + size},{y} "
-
-        if round_corners["br"]:
-            path += f"L {x + size},{y + size - r} Q {x + size},{y + size} {x + size - r},{y + size} "
-        else:
-            path += f"L {x + size},{y + size} "
-
-        if round_corners["bl"]:
-            path += f"L {x + r},{y + size} Q {x},{y + size} {x},{y + size - r} "
-        else:
-            path += f"L {x},{y + size} "
-
-        if round_corners["tl"]:
-            path += f"L {x},{y + r} Q {x},{y} {x + r},{y} "
-        else:
-            path += f"L {x},{y} "
-
-        path += "z"
-        return path
-
-    def _create_squircle_path(self, cx: float, cy: float, size: float) -> str:
-        """Generate SVG path for a squircle (super-ellipse)."""
-        half = size / 2
-        d = half * SQUIRCLE_MAGIC_K
-
-        path = f"M {cx},{cy - half} "
-        path += f"C {cx + d},{cy - half} {cx + half},{cy - d} {cx + half},{cy} "
-        path += f"C {cx + half},{cy + d} {cx + d},{cy + half} {cx},{cy + half} "
-        path += f"C {cx - d},{cy + half} {cx - half},{cy + d} {cx - half},{cy} "
-        path += f"C {cx - half},{cy - d} {cx - d},{cy - half} {cx},{cy - half} z"
-        return path
-
-    def _create_finder_pattern(
-        self, finder_pos: dict, module_size: float, center_style: str, border_style: str
-    ) -> str:
-        """Create a complete finder pattern as cohesive shapes."""
-        row = finder_pos["row"]
-        col = finder_pos["col"]
-        half_size = FINDER_PATTERN_SIZE // 2
-        half_center = FINDER_CENTER_SIZE // 2
-
-        center_x = (col - half_center) * module_size
-        center_y = (row - half_center) * module_size
-        center_size = FINDER_CENTER_SIZE * module_size
-
-        border_x = (col - half_size) * module_size
-        border_y = (row - half_size) * module_size
-        border_outer_size = FINDER_PATTERN_SIZE * module_size
-        border_inner_size = (FINDER_PATTERN_SIZE - 2) * module_size
-        border_inner_x = border_x + module_size
-        border_inner_y = border_y + module_size
-
-        svg_content = ""
-
-        if border_style == "SQUARE":
-            svg_content += '<path fill-rule="evenodd" fill="black" d="'
-            svg_content += f"M {border_x},{border_y} h {border_outer_size} v {border_outer_size} h -{border_outer_size} z "
-            svg_content += f"M {border_inner_x},{border_inner_y} h {border_inner_size} v {border_inner_size} h -{border_inner_size} z"
-            svg_content += '"/>\n'
-
-        elif border_style == "CIRCLE":
-            cx = border_x + border_outer_size / 2
-            cy = border_y + border_outer_size / 2
-            outer_r = border_outer_size / 2
-            inner_r = border_inner_size / 2
-            svg_content += '<path fill-rule="evenodd" fill="black" d="'
-            svg_content += f"M {cx - outer_r},{cy} a {outer_r},{outer_r} 0 1,0 {outer_r * 2},0 a {outer_r},{outer_r} 0 1,0 -{outer_r * 2},0 z "
-            svg_content += f"M {cx - inner_r},{cy} a {inner_r},{inner_r} 0 1,1 {inner_r * 2},0 a {inner_r},{inner_r} 0 1,1 -{inner_r * 2},0 z"
-            svg_content += '"/>\n'
-
-        elif border_style == "SQUIRCLE":
-            outer_cx = border_x + border_outer_size / 2
-            outer_cy = border_y + border_outer_size / 2
-            inner_cx = border_inner_x + border_inner_size / 2
-            inner_cy = border_inner_y + border_inner_size / 2
-
-            svg_content += '<path fill-rule="evenodd" fill="black" d="'
-            svg_content += (
-                self._create_squircle_path(outer_cx, outer_cy, border_outer_size) + " "
-            )
-            svg_content += self._create_squircle_path(
-                inner_cx, inner_cy, border_inner_size
-            )
-            svg_content += '"/>\n'
-
-        svg_content += self._create_large_shape(
-            center_x, center_y, center_size, center_style
+        bmesh.ops.transform(
+            bm,
+            matrix=Matrix.Translation((0, 0, QR_EXTRUDE_HEIGHT)),
+            verts=ext_verts,
         )
 
-        return svg_content
+        # --- clean up coplanar faces & duplicate verts --------------------
+        bmesh.ops.dissolve_limit(
+            bm,
+            angle_limit=0.085,
+            verts=bm.verts,
+            edges=bm.edges,
+            delimit={"NORMAL"},
+        )
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=ROUNDED_MERGE_DIST)
 
-    def _create_large_shape(self, x: float, y: float, size: float, style: str) -> str:
-        """Create a shape for finder pattern centers (3x3 area)."""
-        cx = x + size / 2
-        cy = y + size / 2
+        # --- remove interior faces created by the extrude -----------------
+        from .svg_import import _select_interior_faces
 
-        if style == "SQUARE":
-            return (
-                f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
-            )
-        elif style == "CIRCLE":
-            return f'<circle cx="{cx}" cy="{cy}" r="{size / 2}" fill="black"/>\n'
-        elif style == "SQUIRCLE":
-            return (
-                f'<path fill="black" d="{self._create_squircle_path(cx, cy, size)}"/>\n'
-            )
+        interior = _select_interior_faces(bm)
+        if interior:
+            bmesh.ops.delete(bm, geom=interior, context="FACES")
 
-        return f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
+        # Second dissolve pass + normals
+        bmesh.ops.dissolve_limit(
+            bm,
+            angle_limit=0.085,
+            use_dissolve_boundaries=False,
+            verts=bm.verts,
+            edges=bm.edges,
+            delimit={"NORMAL"},
+        )
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 
-    def _create_shape(
-        self, x: float, y: float, size: float, style: str, round_corners: dict = None
-    ) -> str:
-        """Create an SVG shape for individual QR modules."""
-        cx = x + size / 2
-        cy = y + size / 2
+    def _build_finder_bmesh(
+        self, bm, finder_pos: dict, module_size: float, qr_size: int,
+        center_style: str, border_style: str,
+    ) -> None:
+        """Add one finder pattern (border ring + centre fill) to *bm*."""
+        fcx = (finder_pos["col"] - qr_size / 2 + 0.5) * module_size
+        fcy = (finder_pos["row"] - qr_size / 2 + 0.5) * module_size
 
-        if style == "SQUARE":
-            return (
-                f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
-            )
-        elif style == "CIRCLE":
-            scaled_r = size / 2 * MODULE_SCALE_FACTOR
-            return f'<circle cx="{cx}" cy="{cy}" r="{scaled_r}" fill="black"/>\n'
-        elif style == "SQUIRCLE":
-            scaled_size = size * MODULE_SCALE_FACTOR
-            return f'<path fill="black" d="{self._create_squircle_path(cx, cy, scaled_size)}"/>\n'
-        elif style == "ROUNDED":
-            if round_corners and any(round_corners.values()):
-                return f'<path fill="black" d="{self._create_rounded_rect_path(x, y, size, round_corners)}"/>\n'
-            else:
-                return f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
+        outer_size = FINDER_PATTERN_SIZE * module_size   # 7 modules
+        inner_size = (FINDER_PATTERN_SIZE - 2) * module_size  # 5 modules
+        center_size = FINDER_CENTER_SIZE * module_size    # 3 modules
 
-        return f'<rect x="{x}" y="{y}" width="{size}" height="{size}" fill="black"/>\n'
+        # Border ring – same style for outer and inner ensures equal vertex count
+        outer_v = _shape_verts_for_style(fcx, fcy, outer_size, border_style)
+        inner_v = _shape_verts_for_style(fcx, fcy, inner_size, border_style)
+        _extrude_ring(bm, outer_v, inner_v)
+
+        # Centre fill
+        center_v = _shape_verts_for_style(fcx, fcy, center_size, center_style)
+        _extrude_polygon(bm, center_v)
 
 
 def register() -> None:
@@ -977,9 +927,6 @@ def register() -> None:
             "Warning: segno library not available. QR code generation will be disabled."
         )
         print("To enable QR codes, install the segno wheel in the add-on directory.")
-
-    # Clean up any old temporary files from previous sessions
-    _cleanup_old_temp_files()
 
     bpy.utils.register_class(OBJECT_OT_nfc_toggle_qr_mode)
     bpy.utils.register_class(OBJECT_OT_nfc_generate_qr)

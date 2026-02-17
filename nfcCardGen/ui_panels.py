@@ -123,17 +123,8 @@ class VIEW3D_PT_tag_card_shape(Panel):
             layout.prop(props, "magnet_depth", text="Magnet Hole Depth")
         layout.prop(props, "nfc_choice", text="Add NFC Slot")
 
-        card_height = (
-            props.initial_height
-            + (props.magnet_depth if props.magnet_choice else 0)
-            + (0.8 if props.nfc_choice else 0)
-        )
-        final_height = (
-            props.initial_height
-            + (props.magnet_depth if props.magnet_choice else 0)
-            + (0.8 if props.nfc_choice else 0)
-            + (0.6 if not props.inset_choice else 0)
-        )
+        card_height = props.get_card_height()
+        final_height = props.get_final_height()
 
         row = layout.row()
         row.scale_y = 0.6
@@ -310,6 +301,7 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
             if props.shape_preset == "RECTANGLE"
             else "Inset Design",
         )
+        layout.prop(props, "design_boolean_solver", text="Boolean Solver")
 
     def _draw_design_section(self, layout, props, design_num: int) -> None:
         box = layout.box()
@@ -354,6 +346,9 @@ class VIEW3D_PT_tag_svg_to_mesh_design(Panel):
         elif qr_type == "WIFI":
             box.prop(props, f"qr_wifi_ssid_{design_num}", text="SSID")
             box.prop(props, f"qr_wifi_password_{design_num}", text="Password")
+            warn_row = box.row()
+            warn_row.scale_y = 0.7
+            warn_row.label(text="Note: password is stored in .blend file", icon="ERROR")
             box.prop(props, f"qr_wifi_security_{design_num}", text="Encryption")
             box.prop(props, f"qr_wifi_hidden_{design_num}", text="Hidden Network")
         elif qr_type == "CONTACT":
@@ -460,7 +455,7 @@ class VIEW3D_PT_tag_design_1_text(Panel):
             font_col.label(text=f"Font: {os.path.basename(props.font_path_1)}", icon="FONT_DATA")
         else:
             font_col.label(text="Font: Default", icon="FONT_DATA")
-        font_col.operator("object.nfc_load_font_design1", text="Load Custom Font", icon="FILEBROWSER")
+        font_col.operator("object.nfc_load_font", text="Load Custom Font", icon="FILEBROWSER").design_num = 1
 
         layout.separator(factor=0.5)
 
@@ -542,7 +537,7 @@ class VIEW3D_PT_tag_design_2_text(Panel):
             font_col.label(text=f"Font: {os.path.basename(props.font_path_2)}", icon="FONT_DATA")
         else:
             font_col.label(text="Font: Default", icon="FONT_DATA")
-        font_col.operator("object.nfc_load_font_design2", text="Load Custom Font", icon="FILEBROWSER")
+        font_col.operator("object.nfc_load_font", text="Load Custom Font", icon="FILEBROWSER").design_num = 2
 
         layout.separator(factor=0.5)
 
@@ -617,12 +612,7 @@ class VIEW3D_PT_tag_card_export(Panel):
 
     def _get_card_info_lines(self, props) -> list:
         """Return a list of card info lines to display."""
-        final_height = (
-            props.initial_height
-            + (props.magnet_depth if props.magnet_choice else 0)
-            + (0.8 if props.nfc_choice else 0)
-            + (0 if props.inset_choice else 0.6)
-        )
+        final_height = props.get_final_height()
         info_lines = [f"Final Height: {final_height:.2f} mm"]
         if props.magnet_choice:
             info_lines.append(f"Magnet Depth: {props.magnet_depth:.2f} mm")
@@ -681,8 +671,10 @@ def _camera_view_box(layout, panel_area) -> None:
         side_op = row.operator("object.nfc_set_view", text="Side", icon="AXIS_SIDE")
         side_op.view_type = "SIDE"
     else:
-        print(f"Error: Unknown panel area '{panel_area}' for camera view box.")
-        pass
+        raise ValueError(
+            f"Unknown panel area '{panel_area}' for camera view box. "
+            f"Expected one of: CARD_SHAPE, MAGNET_CAVITY, DESIGN_IMPORT"
+        )
 
 
 def register() -> None:
