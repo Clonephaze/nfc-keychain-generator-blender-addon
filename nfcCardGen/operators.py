@@ -736,24 +736,13 @@ class OBJECT_OT_nfc_export_3mf(Operator, ExportHelper):
             )
             return {"CANCELLED"}
 
-        # GN Set Material nodes create material slots only on the evaluated
-        # object.  The 3MF exporter reads the *original* object's slots, so
-        # we rebuild them to exactly match the evaluated object's slot order.
-        # This ensures face material_index values reference the correct slot.
-        self._sync_evaluated_materials(context, card_obj)
-
         warnings_collected: list[str] = []
 
         result = export_3mf(
             filepath=self.filepath,
             objects=[card_obj],
             use_mesh_modifiers=True,
-            use_orca_format="BASEMATERIAL",
             global_scale=1.0,
-            # Passing object_settings routes through the Orca exporter which
-            # writes colorgroups + paint_color attributes that Orca/BambuStudio
-            # actually reads.  Standard basematerials pid/p1 are ignored by Orca.
-            object_settings={card_obj: {}},
             on_warning=lambda msg: warnings_collected.append(msg),
         )
 
@@ -769,27 +758,6 @@ class OBJECT_OT_nfc_export_3mf(Operator, ExportHelper):
             f"3MF exported successfully to: {os.path.basename(self.filepath)}",
         )
         return {"FINISHED"}
-
-    @staticmethod
-    def _sync_evaluated_materials(context, obj):
-        """Rebuild the original object's material slots to match the evaluated object.
-
-        GN ``Set Material`` nodes add materials only to the evaluated
-        depsgraph copy.  The 3MF exporter reads the original object's
-        slots and uses ``face.material_index`` from the evaluated mesh.
-        To keep them in sync we clear the original's slots and rebuild
-        them in the exact same order as the evaluated object.
-        """
-        depsgraph = context.evaluated_depsgraph_get()
-        eval_obj = obj.evaluated_get(depsgraph)
-
-        # Collect the evaluated slot list in order
-        eval_materials = [slot.material for slot in eval_obj.material_slots]
-
-        # Rebuild original slots to match
-        obj.data.materials.clear()
-        for mat in eval_materials:
-            obj.data.materials.append(mat)
 
 
 class OBJECT_OT_nfc_load_font(Operator, ImportHelper):

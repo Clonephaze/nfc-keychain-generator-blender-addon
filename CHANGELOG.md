@@ -2,7 +2,7 @@
 ## [1.2.0]
 
 ### Added
-- 3MF export with per-face material colours for multi-colour slicing in Orca Slicer / BambuStudio / PrusaSlicer
+- 3MF export with per-face material colors for multi-color slicing in Orca Slicer / BambuStudio / PrusaSlicer
 - Automatic detection of the ThreeMF-io extension (soft dependency — 3MF option only shown when installed)
 - Export format toggle in the UI (3MF / STL) with info text explaining 3MF benefits
 - Boolean solver choice (Exact / Fast) for design boolean operations in the UI
